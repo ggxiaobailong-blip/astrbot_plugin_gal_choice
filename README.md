@@ -1,0 +1,2 @@
+# astrbot_plugin_gal_choice
+Astrbot的GAL化插件
