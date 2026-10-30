@@ -28,6 +28,7 @@ except Exception:  # pragma: no cover
 
 # Avoid hammering an endpoint that just returned 502/503.
 _BAD_UNTIL: dict[str, float] = {}
+_BAD_COOLDOWN = 180.0
 _ENDPOINT_SPLIT = re.compile(r"[,;\s]+")
 
 
@@ -75,32 +76,14 @@ async def _render_one(
     )
 
 
-async def render_image(
+async def _render_remote(
     plugin,
     config: PluginConfig,
     template: str,
     data: dict,
     options: dict,
-    timeout: int = 90,
+    timeout: int,
 ) -> str:
-    """Render with the configured backend, falling back to remote T2I."""
-    backend = config.str("render_backend", "auto").strip().lower()
-    if backend in {"auto", "browser"} and render_browser is not None:
-        try:
-            browser_path = await render_browser(template, data, config)
-            if browser_path:
-                return browser_path
-        except Exception as exc:
-            logger.warning("[gal] 本地浏览器出图不可用，改用 Pillow: %s", exc)
-
-    if backend in {"auto", "local", "browser"} and render_local is not None:
-        try:
-            local_path = await asyncio.to_thread(render_local, data, config)
-            if local_path:
-                return local_path
-        except Exception as exc:
-            logger.warning("[gal] 本地出图失败，回退远程 T2I: %s", exc)
-
     renderer = getattr(getattr(plugin, "context", None), "html_renderer", None)
     candidates = _endpoint_candidates(plugin, config)
     if renderer is None or not hasattr(renderer, "render_custom_template"):
@@ -114,7 +97,7 @@ async def render_image(
             timeout=timeout,
         )
 
-    deadline = time.monotonic() + max(30, timeout)
+    deadline = time.monotonic() + max(8, timeout)
     errors: list[str] = []
     for round_no in range(2):
         tried_any = False
@@ -125,7 +108,7 @@ async def render_image(
             if _BAD_UNTIL.get(endpoint, 0) > now:
                 continue
             tried_any = True
-            remaining = max(8.0, min(30.0, deadline - time.monotonic()))
+            remaining = max(5.0, min(30.0, deadline - time.monotonic()))
             try:
                 result = await _render_one(
                     renderer,
@@ -139,21 +122,78 @@ async def render_image(
                 return result
             except asyncio.TimeoutError:
                 errors.append(f"{endpoint}: 超时")
-                _BAD_UNTIL[endpoint] = time.monotonic() + 20
+                _BAD_UNTIL[endpoint] = time.monotonic() + _BAD_COOLDOWN
                 logger.warning("[gal] 文转图端点超时: %s", endpoint)
             except Exception as exc:
                 status = str(exc)
                 errors.append(f"{endpoint}: {status or type(exc).__name__}")
                 if "502" in status or "503" in status:
-                    _BAD_UNTIL[endpoint] = time.monotonic() + 2
+                    _BAD_UNTIL[endpoint] = time.monotonic() + _BAD_COOLDOWN
                 logger.warning("[gal] 文转图端点失败 %s: %s", endpoint, exc)
         if time.monotonic() >= deadline:
             break
         if not tried_any and round_no == 0:
             # Every endpoint is cooling down; wait one short interval.
-            await asyncio.sleep(2.2)
+            await asyncio.sleep(1.0)
         elif round_no == 0:
-            await asyncio.sleep(2.2)
+            await asyncio.sleep(1.0)
 
     detail = "; ".join(errors[-4:]) if errors else "没有可用的文转图端点"
     raise RuntimeError(f"所有文转图端点都失败: {detail}")
+
+
+async def render_image(
+    plugin,
+    config: PluginConfig,
+    template: str,
+    data: dict,
+    options: dict,
+    timeout: int = 90,
+) -> str:
+    """Render in priority order: T2I, local Chromium, Pillow.
+
+    ``auto`` is deliberately T2I-first but caps the remote attempt so a broken
+    endpoint cannot delay the local fallback for the full 90 seconds.
+    """
+    backend = config.str("render_backend", "auto").strip().lower()
+    # 0.4.3/0.4.4 used "local" as the Pillow default. Treat it as legacy
+    # auto so upgrades get T2I-first again instead of silently staying Pillow.
+    if backend == "local":
+        backend = "auto"
+    if backend not in {"auto", "remote", "browser", "pillow"}:
+        backend = "auto"
+
+    if backend in {"auto", "remote"}:
+        remote_timeout = min(timeout, 15) if backend == "auto" else timeout
+        try:
+            result = await _render_remote(
+                plugin, config, template, data, options, remote_timeout
+            )
+            logger.info("[gal] 出图后端: T2I")
+            return result
+        except Exception as exc:
+            if backend == "remote":
+                raise
+            logger.warning("[gal] T2I 出图失败，切换本地浏览器: %s", exc)
+
+    if backend in {"auto", "browser"} and render_browser is not None:
+        try:
+            browser_path = await render_browser(template, data, config)
+            if browser_path:
+                logger.info("[gal] 出图后端: 本地 Chromium HTML/CSS")
+                return browser_path
+        except Exception as exc:
+            logger.warning("[gal] 本地浏览器出图不可用，改用 Pillow: %s", exc)
+
+    if backend in {"auto", "browser", "pillow"} and render_local is not None:
+        try:
+            local_path = await asyncio.to_thread(render_local, data, config)
+            if local_path:
+                logger.info("[gal] 出图后端: 本地 Pillow")
+                return local_path
+        except Exception as exc:
+            logger.warning("[gal] 本地 Pillow 出图失败: %s", exc)
+
+    raise RuntimeError("没有可用的出图后端")
+
+

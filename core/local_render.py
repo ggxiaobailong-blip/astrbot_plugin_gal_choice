@@ -171,6 +171,24 @@ def _draw_character(canvas: Image.Image, data: dict) -> None:
     canvas.alpha_composite(char, (center_x - char.width // 2, top))
 
 
+def _draw_scene_tag(canvas: Image.Image) -> None:
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    font = _font(12)
+    text = "GAL MODE"
+    width = int(draw.textlength(text, font=font)) + 43
+    draw.rounded_rectangle(
+        (28, 24, 28 + width, 51),
+        radius=14,
+        fill=(8, 18, 32, 112),
+        outline=(255, 255, 255, 56),
+        width=1,
+    )
+    draw.ellipse((39, 33, 46, 40), fill=(103, 199, 255, 255))
+    draw.text((53, 30), text, font=font, fill=(234, 244, 255, 255))
+    canvas.alpha_composite(overlay)
+
+
 def _draw_options(canvas: Image.Image, data: dict) -> None:
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
@@ -342,6 +360,7 @@ def render_local(data: dict, config: PluginConfig | None = None) -> str:
     _draw_character(canvas, data)
     _draw_options(canvas, data)
     _draw_dialog(canvas, data)
+    _draw_scene_tag(canvas)
 
     cache = plugin_data_dir("astrbot_plugin_gal_choice") / "image_cache"
     cache.mkdir(parents=True, exist_ok=True)

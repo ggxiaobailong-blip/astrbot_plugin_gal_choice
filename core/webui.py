@@ -248,7 +248,9 @@ class GalWebUI:
             self.config.set("render_endpoint", endpoint)
         if "render_backend" in payload:
             backend = str(payload.get("render_backend") or "auto").strip().lower()
-            if backend not in {"auto", "local", "browser", "remote"}:
+            if backend == "local":
+                backend = "auto"
+            if backend not in {"auto", "browser", "pillow", "remote"}:
                 backend = "auto"
             self.config.set("render_backend", backend)
         if "dialogue_max_lines" in payload:

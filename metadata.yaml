@@ -10,7 +10,7 @@ desc: >-
   自带 WebUI 资源工作台：上传角色立绘和表情差分、上传背景、可视化调整立绘位置/高度/宽度，
   保存后立即预览；资源保存在 plugin_data，更新插件不会丢。
   本插件基于 bvzrays/astrbot_plugin_qqgal 改动，按 AGPL-3.0 发布。
-version: 0.4.4
+version: 0.4.5
 author: iv小白龙
 repo: https://github.com/ggxiaobailong-blip/astrbot_plugin_gal_choice
 social_link: https://github.com/ggxiaobailong-blip

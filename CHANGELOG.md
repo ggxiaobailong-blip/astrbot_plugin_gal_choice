@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.5 - 2026-10-30
+
+- 出图优先级改为 **T2I → 本地 Chromium HTML/CSS → Pillow**；`auto` 的 T2I 尝试最多 15 秒，失败后立即切本地，不让坏端点拖满 90 秒；失败端点冷却 180 秒，后续轮次直接走本地，避免连续等待。
+- 旧配置值 `render_backend=local` 自动迁移为 `auto`；想强制 Pillow 请选 `pillow`。
+- 恢复左上角 `GAL MODE` 标签；HTML 模板和 Pillow 兜底都保留该元素，界面布局不缺东西。
+- WebUI 出图方式同步改为 T2I 优先描述。
+- 保留 `render_backend=browser/local/remote` 供手动指定。
+
 ## 0.4.4 - 2026-10-30
 
 - 新增本地 Chromium/Playwright 出图：直接截图真实 HTML/CSS 模板，效果与 T2I 一致（图标、幕数、选项卡、阴影全部保留），不经过网络。

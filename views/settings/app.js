@@ -296,7 +296,7 @@ function renderSettings() {
   $("#alphaVal").textContent = Number($("#boxAlpha").value).toFixed(2);
   $("#imageQuality").value = settings.image_quality ?? 90;
   $("#qualityVal").textContent = $("#imageQuality").value;
-  $("#renderBackend").value = ["auto", "browser", "local", "remote"].includes(settings.render_backend)
+  $("#renderBackend").value = ["auto", "browser", "pillow", "remote"].includes(settings.render_backend)
     ? settings.render_backend
     : "auto";
   $("#dialogueMaxLines").value = String(settings.dialogue_max_lines ?? 3);

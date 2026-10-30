@@ -23,7 +23,8 @@
 - **会话级模型**：`/gal model <provider_id>` 指定 gal 模式用哪个模型，退出时恢复原模型。
 - **背景连续**：默认一个会话固定一张背景，不会每轮跳来跳去；可切换为随机或固定。
 - **角色视角**：台词强制为角色第一人称直接对玩家说的话，禁止旁白、小说叙述、动作/环境/心理描写；选项也要求是玩家能直接说出口的回应。
-- **本地出图**：默认 `render_backend=auto`。服务器有 Chromium/Playwright 时直接用真实 HTML/CSS 截图，效果与 T2I 一致且不走网络；没有浏览器时用 Pillow 兜底。可执行 `python -m playwright install chromium` 安装本地浏览器。
+- **出图优先级**：默认 `render_backend=auto`，先用 T2I 出图；T2I 失败或超过 15 秒自动切换本地 Chromium HTML/CSS；浏览器不可用才用 Pillow 兜底。T2I 失败端点会冷却 180 秒，避免每轮都等超时。界面布局和 T2I 保持同一套模板、同一套图标和幕数。
+- **本地浏览器**：可执行 `python -m playwright install chromium` 安装；安装后 T2I 失败也能得到与 T2I 同一套 HTML/CSS 的完整效果。
 - **单图多行**：一轮可输出 2~3 行连续台词，仍只生成一张 1280×720 图；多行语音按句合成、插入可配置静音后合并成一条语音。
 - **内置防抖**：gal 模式下同一用户连续发来的几条消息会合并成一轮再请求模型，不需要额外装防抖插件。**本插件已包含完整防抖能力，请不要再同时启用 `reply_merge` 等外部防抖插件**；如果服务器上已经装了，请在 WebUI 里关闭它，否则同一轮可能被合并两次。
 - **失败可降级**：模型没按格式输出或 T2I 出图失败时，发可读的文字选项，不会把 `<say><opt>` 原样吐给玩家。
@@ -173,7 +174,7 @@ data/plugin_data/astrbot_plugin_gal_choice/
 | `show_turn_label` | bool | `true` | 右下角“序章 / 第 N 幕” |
 | `say_font_size` | int | `26` | 台词基准字号 |
 | `image_quality` | int | `90` | 出图 JPEG 质量 |
-| `render_backend` | string | `auto` | `auto` 浏览器优先、`local` Pillow、`browser` 仅浏览器、`remote` 远程 T2I |
+| `render_backend` | string | `auto` | `auto` T2I→浏览器→Pillow；`browser` 本地浏览器；`pillow` Pillow；`remote` 只 T2I |
 | `render_endpoint` | string | `""` | 首选文转图端点，多个用逗号分隔；留空用 AstrBot 全局 T2I，失败会自动尝试端点池 |
 | `voice_enabled` | bool | `true` | 台词配音总开关 |
 | `voice_probability` | float | `1.0` | 每条台词配音概率 |
