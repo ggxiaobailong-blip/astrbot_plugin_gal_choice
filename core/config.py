@@ -59,6 +59,7 @@ DEFAULTS: dict = {
     "show_turn_label": True,
     "say_font_size": 26,
     "image_quality": 90,
+    "render_backend": "auto",
     "render_endpoint": "",
     "voice_enabled": True,
     "voice_probability": 1.0,

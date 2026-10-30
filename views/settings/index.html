@@ -164,6 +164,15 @@
             <input type="range" id="imageQuality" min="30" max="100" step="1" value="90" />
           </div>
           <div class="field">
+            <label for="renderBackend">出图方式</label>
+            <select id="renderBackend">
+              <option value="auto" selected>自动（浏览器优先，效果最好）</option>
+              <option value="browser">本地浏览器 HTML/CSS</option>
+              <option value="local">本地 Pillow（无浏览器时）</option>
+              <option value="remote">远程 T2I（慢，可能 502/503）</option>
+            </select>
+          </div>
+          <div class="field">
             <label for="dialogueMaxLines">单图最多对话行数</label>
             <select id="dialogueMaxLines">
               <option value="1">1 行</option>

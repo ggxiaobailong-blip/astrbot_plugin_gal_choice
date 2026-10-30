@@ -10,6 +10,16 @@ import time
 from .config import PluginConfig
 
 try:
+    from .local_render import render_local
+except Exception:  # pragma: no cover - Pillow missing on a stripped host
+    render_local = None
+
+try:
+    from .browser_render import render_browser
+except Exception:  # pragma: no cover - optional dependency
+    render_browser = None
+
+try:
     from astrbot.api import logger
 except Exception:  # pragma: no cover
     import logging
@@ -73,7 +83,24 @@ async def render_image(
     options: dict,
     timeout: int = 90,
 ) -> str:
-    """Render with preferred endpoint, then the AstrBot pool, with retries."""
+    """Render with the configured backend, falling back to remote T2I."""
+    backend = config.str("render_backend", "auto").strip().lower()
+    if backend in {"auto", "browser"} and render_browser is not None:
+        try:
+            browser_path = await render_browser(template, data, config)
+            if browser_path:
+                return browser_path
+        except Exception as exc:
+            logger.warning("[gal] 本地浏览器出图不可用，改用 Pillow: %s", exc)
+
+    if backend in {"auto", "local", "browser"} and render_local is not None:
+        try:
+            local_path = await asyncio.to_thread(render_local, data, config)
+            if local_path:
+                return local_path
+        except Exception as exc:
+            logger.warning("[gal] 本地出图失败，回退远程 T2I: %s", exc)
+
     renderer = getattr(getattr(plugin, "context", None), "html_renderer", None)
     candidates = _endpoint_candidates(plugin, config)
     if renderer is None or not hasattr(renderer, "render_custom_template"):

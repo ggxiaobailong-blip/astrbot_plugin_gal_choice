@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.4 - 2026-10-30
+
+- 新增本地 Chromium/Playwright 出图：直接截图真实 HTML/CSS 模板，效果与 T2I 一致（图标、幕数、选项卡、阴影全部保留），不经过网络。
+- 默认 `render_backend=auto`：有本地 Chromium 时用浏览器，没装浏览器时用改进后的 Pillow，再失败才回退远程 T2I。
+- 修复底栏「第 N 幕」被右下角图标遮挡：HTML footer 和 Pillow 底栏都留出图标区域。
+- Pillow 兜底补全 6 个控件图标，不再只画 4 个占位条。
+- 本地浏览器渲染依赖 Playwright + Chromium；可用 `python -m playwright install chromium` 安装，未安装会自动走 Pillow。
+
+## 0.4.3 - 2026-10-30
+
+- 新增本地 Pillow 出图，默认 `render_backend=local`，不再依赖远程 T2I；单张出图从数秒降到本地几十毫秒，且不会因 t2i 502/503 失败。
+- 本地渲染复用同一套立绘、背景、选项、2~3 行对话和外观配置；内置 Droid Sans Fallback 字体，无系统中文字体也能正常显示。
+- 保留 `render_backend=remote` 作为可选后端；本地渲染异常时才回退远程 T2I。
+- 新增 WebUI「出图方式」选择。
+
 ## 0.4.2 - 2026-10-30
 
 - 修复插件未出现在 WebUI 插件列表的问题：移除错误的 `@register` 装饰位置，改为主类 `GalChoicePlugin` 自动识别，WebUI 可正常看到插件和配置页。

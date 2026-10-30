@@ -295,6 +295,12 @@
       "step": 1
     }
   },
+  "render_backend": {
+    "type": "string",
+    "description": "出图方式",
+    "hint": "auto = 有本地 Chromium 时用真实 HTML/CSS（效果最好），没有则用 Pillow；local = 只 Pillow；browser = 只浏览器；remote = 远程 T2I。",
+    "default": "auto"
+  },
   "render_endpoint": {
     "type": "string",
     "description": "文转图服务地址（可选，多个用逗号分隔）",

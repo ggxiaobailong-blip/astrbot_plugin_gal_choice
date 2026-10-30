@@ -296,6 +296,9 @@ function renderSettings() {
   $("#alphaVal").textContent = Number($("#boxAlpha").value).toFixed(2);
   $("#imageQuality").value = settings.image_quality ?? 90;
   $("#qualityVal").textContent = $("#imageQuality").value;
+  $("#renderBackend").value = ["auto", "browser", "local", "remote"].includes(settings.render_backend)
+    ? settings.render_backend
+    : "auto";
   $("#dialogueMaxLines").value = String(settings.dialogue_max_lines ?? 3);
   $("#voiceLineGap").value = settings.voice_line_gap_ms ?? 1000;
   $("#gapVal").textContent = `${$("#voiceLineGap").value}ms`;
@@ -394,6 +397,7 @@ async function saveSettings() {
       free_option_hint: $("#freeHint").value,
       box_alpha: Number($("#boxAlpha").value),
       image_quality: Number($("#imageQuality").value),
+      render_backend: $("#renderBackend").value,
       dialogue_max_lines: Number($("#dialogueMaxLines").value),
       voice_line_gap_ms: Number($("#voiceLineGap").value),
       gal_debounce_enabled: $("#debounceEnabled").checked,

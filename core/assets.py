@@ -620,6 +620,7 @@ class AssetStore:
                 "free_option_hint": self.config.str("free_option_hint", "✎ 自己说点什么…"),
                 "box_alpha": self.config.float("box_alpha", 0.94, 0.2, 1.0),
                 "image_quality": self.config.int("image_quality", 90, 30, 100),
+                "render_backend": self.config.str("render_backend", "auto"),
                 "render_endpoint": self.config.str("render_endpoint", ""),
                 "dialogue_max_lines": self.config.int("dialogue_max_lines", 3, 1, 3),
                 "voice_line_gap_ms": self.config.int("voice_line_gap_ms", 1000, 0, 2500),

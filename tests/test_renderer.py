@@ -58,6 +58,19 @@ class RendererTest(unittest.TestCase):
         self.assertTrue(all(item["font"] >= 17 for item in data["lines"]))
         self.assertEqual(data["lines"][0]["text"], "你终于来了。")
 
+    def test_local_renderer_outputs_card(self):
+        from PIL import Image
+
+        from core.local_render import render_local
+
+        _, data = self.build()
+        path = render_local(data, self.config)
+        try:
+            with Image.open(path) as image:
+                self.assertEqual(image.size, (1280, 720))
+        finally:
+            Path(path).unlink(missing_ok=True)
+
     def test_custom_layout_is_used(self):
         profile = self.assets.create("自定义")
         self.assets.save_layout(profile.id, {"left": 22, "top": 44, "height": 700, "max_width": 48})

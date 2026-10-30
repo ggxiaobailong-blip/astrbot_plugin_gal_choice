@@ -750,6 +750,12 @@ class GalChoicePlugin(Star):
         self._locks.clear()
         self._pending_voice.clear()
         self._debounce_windows.clear()
+        try:
+            from .core.browser_render import close_browser
+
+            await close_browser()
+        except Exception:
+            pass
 
 
 # Backward-compatible alias for tests / external imports.

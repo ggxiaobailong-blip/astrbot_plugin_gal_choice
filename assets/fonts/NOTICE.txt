@@ -1,0 +1,7 @@
+Droid Sans Fallback
+Copyright (C) 2008 The Android Open Source Project
+Licensed under the Apache License, Version 2.0.
+https://www.apache.org/licenses/LICENSE-2.0
+
+This font is bundled so the local Pillow renderer can display CJK text on
+servers that do not have a CJK font installed.

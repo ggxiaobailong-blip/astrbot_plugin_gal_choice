@@ -246,6 +246,11 @@ class GalWebUI:
                 if item and not item.startswith(("http://", "https://")):
                     return error_response("文转图端点必须是 http(s) 地址", status_code=400)
             self.config.set("render_endpoint", endpoint)
+        if "render_backend" in payload:
+            backend = str(payload.get("render_backend") or "auto").strip().lower()
+            if backend not in {"auto", "local", "browser", "remote"}:
+                backend = "auto"
+            self.config.set("render_backend", backend)
         if "dialogue_max_lines" in payload:
             try:
                 lines = max(1, min(3, int(payload.get("dialogue_max_lines"))))
