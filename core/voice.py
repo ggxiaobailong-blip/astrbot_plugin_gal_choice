@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import io
 import random
 import re
@@ -31,6 +32,25 @@ except Exception:  # pragma: no cover - dependency is optional outside QQ
 
 _TTS_TIMEOUT = 30
 _PLUGIN_NAME = "astrbot_plugin_gal_choice"
+
+
+class _SilkRecord(Record):
+    """Record whose base64 payload stays SILK.
+
+    AstrBot's stock Record.convert_to_base64() asks MediaResolver for WAV,
+    which undoes our pre-encoding and makes NapCat's broken ntsilk ffmpeg run.
+    Overriding it lets the regular MessageChain path carry the SILK bytes.
+    """
+
+    async def convert_to_base64(self) -> str:
+        path = self.path or (
+            self.file.removeprefix("file://") if self.file else ""
+        )
+        try:
+            return base64.b64encode(Path(path).read_bytes()).decode("ascii")
+        except OSError:
+            return await super().convert_to_base64()
+
 
 
 def clean_voice_text(text: str, limit: int = 200) -> str:
@@ -209,7 +229,9 @@ class VoiceService:
             return
         audio = str(audio)
 
-        is_qq = event.get_platform_name() == "aiocqhttp"
+        platform = (event.get_platform_name() or "").lower()
+        umo = event.unified_msg_origin or ""
+        is_qq = platform.startswith("aiocqhttp") or umo.startswith("bot:")
         if is_qq:
             audio = await self._to_silk(audio) or ""
             if not audio:
@@ -217,7 +239,14 @@ class VoiceService:
                 return
 
         try:
-            if audio.startswith("http://") or audio.startswith("https://"):
+            if is_qq:
+                path = Path(audio).resolve()
+                record = _SilkRecord(
+                    file=path.as_uri(),
+                    path=str(path),
+                    text=body,
+                )
+            elif audio.startswith("http://") or audio.startswith("https://"):
                 record = Record.fromURL(audio, text=body)
             else:
                 record = Record.fromFileSystem(audio, text=body)
@@ -225,6 +254,11 @@ class VoiceService:
                 event.unified_msg_origin,
                 MessageChain([record]),
             )
-            logger.info("[gal] 配音已发送 %s 字（%s）", len(body), "silk" if is_qq else "原始音频")
+            logger.info(
+                "[gal] 配音已发送 %s 字（%s，platform=%s）",
+                len(body),
+                "silk" if is_qq else "原始音频",
+                platform or "?",
+            )
         except Exception as exc:
             logger.warning("[gal] 配音发送失败: %s", exc)

@@ -82,7 +82,7 @@ PLUGIN_NAME = "astrbot_plugin_gal_choice"
 _GENERIC_START = ("开始", "来吧", "随便", "你决定", "都行", "继续")
 
 
-@register(PLUGIN_NAME, "iv小白龙", "GalGame 选项成图 + 配音 + 资源工作台", "0.3.10")
+@register(PLUGIN_NAME, "iv小白龙", "GalGame 选项成图 + 配音 + 资源工作台", "0.3.11")
 class GalChoice(Star):
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)

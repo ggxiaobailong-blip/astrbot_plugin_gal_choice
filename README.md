@@ -31,7 +31,7 @@
 - AstrBot `>=4.21,<5`
 - 一个可用的 **文转图（T2I）** 服务：AstrBot 自带的 Playwright 渲染，或远程 T2I 服务
 - 一个可用的 **TTS** 提供商（可选，但强烈推荐 FishAudio）
-- QQ 语音需要 **`silk-python`**（`requirements.txt` 已声明，市场安装会自动装）和 **ffmpeg**；插件会把 WAV/MP3 预转成 Tencent SILK，绕开 NapCat 自带 ffmpeg 缺少 `ntsilk_s16le` 编码器的问题
+- QQ 语音需要 **`silk-python`**（`requirements.txt` 已声明，市场安装会自动装）和 **ffmpeg**；插件会把 WAV/MP3 预转成 Tencent SILK，绕过 NapCat 自带 ffmpeg 缺少 `ntsilk_s16le` 编码器的问题。注意 AstrBot 的普通 `Record` 会强制转回 WAV，本插件用专用 `_SilkRecord` 直接发送 SILK base64。
 - 消息平台：**QQ 个人号（aiocqhttp / NapCat）**。本版本只声明支持 `aiocqhttp`
 
 ## 安装

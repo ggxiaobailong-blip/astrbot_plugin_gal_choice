@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.11 - 2026-10-30
+
+- 修复 QQ 语音仍然被转成 WAV 的问题：AstrBot 的 `Record.convert_to_base64()` 会强制 `target_format="wav"`，把预转的 SILK 又转回 WAV，导致 NapCat 的 ntsilk 编码器报错。
+- 新增 `_SilkRecord`：只覆盖 `convert_to_base64()`，直接发送 SILK 的 base64；普通 `Record` 仍用于非 QQ 平台。
+- QQ 平台判断增加 `umo.startswith("bot:")` 兜底，避免平台名差异导致漏转。
+- 服务器实测：直发 SILK 后 NapCat 日志为“语音文件已就绪 / 发送 -> 私聊 [语音 4s]”，没有 ntsilk 报错。
+
 ## 0.3.10 - 2026-10-30
 
 - 强化 GalGame 角色视角：`<say>` 必须是角色第一人称直接对玩家说的话，禁止旁白、小说叙述、动作/环境/心理描写、第三人称和舞台提示。
