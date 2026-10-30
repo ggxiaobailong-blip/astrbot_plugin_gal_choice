@@ -34,7 +34,7 @@ DEFAULT_EMOTION_MAP = {
 }
 
 DEFAULTS: dict = {
-    "mode_on_words": "进入gal模式,gal模式,切换gal模式,开始gal",
+    "mode_on_words": "gal,进入gal模式,gal模式,切换gal模式,开始gal,gal启动,启动gal,开始gal模式,开启gal,开gal",
     "mode_off_words": "退出gal模式,退出gal,结束gal,退出游戏,关闭gal",
     "mode_idle_minutes": 120,
     "option_ttl": 600,

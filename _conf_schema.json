@@ -2,8 +2,8 @@
   "mode_on_words": {
     "type": "string",
     "description": "进入 GalGame 模式的说法",
-    "hint": "英文逗号分隔。整条消息与其中任意一个完全一致时才进入模式，避免“gal模式是什么”误触发；推荐同时使用 /gal start。",
-    "default": "进入gal模式,gal模式,切换gal模式,开始gal"
+    "hint": "英文逗号分隔。整条消息与其中任意一个完全一致时才进入模式，避免“gal模式是什么”误触发；推荐同时使用 /gal start。群聊里 @机器人 的前缀会被忽略。",
+    "default": "gal,进入gal模式,gal模式,切换gal模式,开始gal,gal启动,启动gal,开始gal模式,开启gal,开gal"
   },
   "mode_off_words": {
     "type": "string",

@@ -271,6 +271,59 @@ def phrase_hit(text: str, words: list[str] | tuple[str, ...]) -> bool:
     return any(normalized == normalize_phrase(word) for word in words if word)
 
 
+_EXIT_MARKERS = ("退出", "关闭", "结束", "不玩", "别玩", "停止", "quit", "exit")
+_START_MARKERS = ("启动", "开始", "进入", "开启", "打开", "切换", "来玩", "玩")
+_QUESTION_WORDS = ("什么", "怎么", "如何", "为什么", "为啥", "吗", "哪", "谁", "是不是")
+_EXIT_NEGATION = re.compile(r"(不要|别|不想|不用|无需)(?:退出|关闭|结束|停止)")
+
+
+def _intent_text(text: str) -> str:
+    return normalize_text(text)
+
+
+def _is_question(text: str) -> bool:
+    raw = unicodedata.normalize("NFKC", text or "").casefold()
+    return "?" in raw or "？" in raw or any(word in raw for word in _QUESTION_WORDS)
+
+
+def is_exit_intent(text: str, words: list[str] | tuple[str, ...] = ()) -> bool:
+    """Fuzzy exit: 结束gal / 退出 / 关闭 / 不玩了 all count."""
+    raw = unicodedata.normalize("NFKC", text or "").casefold()
+    normalized = _intent_text(text)
+    if not normalized:
+        return False
+    if _EXIT_NEGATION.search(raw):
+        return False
+    if any(_intent_text(word) and _intent_text(word) in normalized for word in words):
+        return True
+    if not any(marker in normalized for marker in _EXIT_MARKERS):
+        return False
+    # Bare short commands are unambiguous; otherwise require "gal".
+    return "gal" in normalized or len(normalized) <= 8
+
+
+def is_start_intent(text: str, words: list[str] | tuple[str, ...] = ()) -> bool:
+    """Fuzzy start: gal启动 / 启动gal / 来玩gal / gal模式 all count.
+
+    Exit intents win first, so "结束gal" never starts a new session.
+    """
+    raw = unicodedata.normalize("NFKC", text or "").casefold()
+    normalized = _intent_text(text)
+    if not normalized:
+        return False
+    if is_exit_intent(text, words=()):
+        return False
+    if _is_question(text):
+        return False
+    if re.search(r"(不要|别|不想|不用|无需)(?:启动|开始|进入|开启|打开|玩)", raw):
+        return False
+    if any(_intent_text(word) and _intent_text(word) in normalized for word in words):
+        return True
+    if normalized in {"gal", "galgame"} or "gal模式" in normalized or "gal游戏" in normalized:
+        return True
+    return "gal" in normalized and any(marker in normalized for marker in _START_MARKERS)
+
+
 def _longest_common_substring(a: str, b: str) -> int:
     if not a or not b:
         return 0

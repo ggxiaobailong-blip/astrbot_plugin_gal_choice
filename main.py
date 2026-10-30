@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 
 from astrbot.api import logger
@@ -23,6 +24,8 @@ if __package__:
         LETTERS,
         OptionMatch,
         clean_message,
+        is_exit_intent,
+        is_start_intent,
         match_option,
         parse_gal_reply,
         phrase_hit,
@@ -51,6 +54,8 @@ else:  # pragma: no cover - only used when running the file directly
         LETTERS,
         OptionMatch,
         clean_message,
+        is_exit_intent,
+        is_start_intent,
         match_option,
         parse_gal_reply,
         phrase_hit,
@@ -77,7 +82,7 @@ PLUGIN_NAME = "astrbot_plugin_gal_choice"
 _GENERIC_START = ("开始", "来吧", "随便", "你决定", "都行", "继续")
 
 
-@register(PLUGIN_NAME, "iv小白龙", "GalGame 选项成图 + 配音 + 资源工作台", "0.3.7")
+@register(PLUGIN_NAME, "iv小白龙", "GalGame 选项成图 + 配音 + 资源工作台", "0.3.9")
 class GalChoice(Star):
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
@@ -118,7 +123,16 @@ class GalChoice(Star):
         return lock
 
     def _entry_words(self) -> list[str]:
-        return self.config.words("mode_on_words", "进入gal模式,gal模式,切换gal模式,开始gal")
+        return self.config.words(
+            "mode_on_words",
+            "gal,进入gal模式,gal模式,切换gal模式,开始gal,gal启动,启动gal,开始gal模式,开启gal,开gal",
+        )
+
+    def _trigger_text(self, event: AstrMessageEvent) -> str:
+        """Normalize a group message: drop leading @mentions and punctuation."""
+        text = clean_message(event.message_str).strip()
+        text = re.sub(r"^(?:\s*@[^\s@]+)+", "", text).strip()
+        return text.strip(" \t\r\n。.!！?？~～,，")
 
     def _exit_words(self) -> list[str]:
         return self.config.words("mode_off_words", "退出gal模式,退出gal,结束gal,退出游戏,关闭gal")
@@ -360,7 +374,7 @@ class GalChoice(Star):
         try:
             key = self._key(event)
             session = self.store.get(key)
-            text = clean_message(event.message_str)
+            text = self._trigger_text(event)
 
             if session is not None and session.mode == "gal":
                 # 私聊本来就会唤醒；群聊里必须显式打开这个标志，否则
@@ -374,7 +388,10 @@ class GalChoice(Star):
                     await self._switch_provider(event, session, target)
                 return
 
-            if text and phrase_hit(text, self._entry_words()):
+            if text and is_exit_intent(text, self._exit_words()):
+                return
+
+            if is_start_intent(text, self._entry_words()):
                 session = self.store.get_or_create(key)
                 await self._enter(event, session)
                 await self.store.save()
@@ -402,10 +419,10 @@ class GalChoice(Star):
             if session is None or session.mode != "gal":
                 return
 
-            text = clean_message(event.message_str)
+            text = self._trigger_text(event)
             hints: list[str] = []
 
-            if text and phrase_hit(text, self._exit_words()):
+            if text and is_exit_intent(text, self._exit_words()):
                 await self._exit(event, session)
                 hints.append(EXIT_HINT)
                 await self.store.save()
@@ -474,10 +491,6 @@ class GalChoice(Star):
         try:
             key = self._key(event)
             session = self.store.get(key)
-            if session is None or session.mode != "gal":
-                return
-            # 不要把模型思考过程插到图片前面
-            event.set_extra("_llm_reasoning_content", "")
 
             result = event.get_result()
             if result is None or not getattr(result, "chain", None):
@@ -492,6 +505,19 @@ class GalChoice(Star):
             ).strip()
             if not text:
                 return
+
+            if session is None or session.mode != "gal":
+                # Group chats sometimes keep a gal-shaped answer in memory even
+                # when the trigger was not recognized.  Never leak raw tags.
+                if "<say>" not in text and "<opt>" not in text:
+                    return
+                session = self.store.get_or_create(key)
+                session.mode = "gal"
+                await self.store.save()
+                logger.warning("[gal] 未进入模式但检测到 gal 标签，自动接管 key=%s", key)
+
+            # 不要把模型思考过程插到图片前面
+            event.set_extra("_llm_reasoning_content", "")
 
             # 只处理 LLM 结果；/gal status 之类的指令输出保持原样。
             # 旧版本或第三方 runner 可能把 LLM 结果标成 GENERAL_RESULT，

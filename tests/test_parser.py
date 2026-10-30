@@ -4,6 +4,8 @@ from core.parser import (
     clean_message,
     display_units,
     fit_text,
+    is_exit_intent,
+    is_start_intent,
     match_option,
     parse_gal_reply,
     phrase_hit,
@@ -78,6 +80,22 @@ class ParserTest(unittest.TestCase):
 
     def test_phrase_hit_is_exact(self):
         self.assertTrue(phrase_hit("进入gal模式吧", ["进入gal模式"]))
+
+    def test_fuzzy_start_intent(self):
+        self.assertTrue(is_start_intent("gal启动！"))
+        self.assertTrue(is_start_intent("启动gal！"))
+        self.assertTrue(is_start_intent("来玩gal"))
+        self.assertTrue(is_start_intent("gal模式"))
+        self.assertFalse(is_start_intent("gal是什么"))
+        self.assertFalse(is_start_intent("gal模式怎么退出"))
+
+    def test_fuzzy_exit_intent_has_priority(self):
+        self.assertTrue(is_exit_intent("结束gal"))
+        self.assertTrue(is_exit_intent("gal结束"))
+        self.assertTrue(is_exit_intent("不玩了"))
+        self.assertTrue(is_exit_intent("退出"))
+        self.assertFalse(is_exit_intent("不要结束"))
+        self.assertFalse(is_start_intent("结束gal"))
         self.assertFalse(phrase_hit("gal模式是什么", ["gal模式"]))
         self.assertTrue(phrase_hit("/gal start", ["/gal start"]))
 
