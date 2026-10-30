@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GalGame 资源工作台</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>GalGame 资源工作台</h1>
+      <p class="muted">上传立绘差分、背景，调好位置后再保存。所有资源保存在 AstrBot 的 plugin_data 目录，更新插件不会丢。</p>
+    </div>
+    <button class="btn ghost" id="refreshBtn" type="button">刷新状态</button>
+  </header>
+
+  <main class="shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <h2>角色</h2>
+        <button class="btn small" id="createCharBtn" type="button">+ 新建</button>
+      </div>
+      <div class="char-list" id="charList"></div>
+      <p class="tip">内置角色只读；新建角色后可上传立绘和差分。点击角色卡片切换。</p>
+    </aside>
+
+    <section class="workspace">
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="role" type="button">角色与位置</button>
+        <button class="tab" data-tab="background" type="button">背景</button>
+        <button class="tab" data-tab="appearance" type="button">外观</button>
+        <button class="tab" data-tab="help" type="button">说明</button>
+      </nav>
+
+      <section class="panel" id="panel-role">
+        <div class="role-grid">
+          <div class="preview-card">
+            <div class="preview-head">
+              <span class="badge" id="activeBadge">内置角色</span>
+              <button class="btn small ghost" id="previewBtn" type="button">刷新预览</button>
+            </div>
+            <div class="preview-stage" id="previewStage">
+              <div class="preview-empty" id="previewEmpty">正在生成预览…</div>
+              <img id="previewImage" alt="预览" hidden />
+            </div>
+            <p class="tip" id="previewTip">预览会使用当前角色、背景和位置参数。</p>
+          </div>
+
+          <div class="controls">
+            <div class="field">
+              <label for="charName">角色名</label>
+              <div class="row">
+                <input id="charName" maxlength="40" />
+                <button class="btn small ghost" id="renameCharBtn" type="button">改名</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="previewSay">台词预览</label>
+              <input id="previewSay" maxlength="60" value="先别急，我们一个一个来试嘛。" />
+            </div>
+            <div class="field">
+              <label for="previewQuote">玩家原话</label>
+              <input id="previewQuote" maxlength="80" value="最近总是睡不好，有没有什么办法能改善一下？" />
+            </div>
+            <div class="field">
+              <label for="previewEmotion">表情</label>
+              <select id="previewEmotion"></select>
+            </div>
+            <div class="slider-grid">
+              <label class="slider">
+                <span>水平位置 <b id="leftVal">31%</b></span>
+                <input type="range" id="left" min="0" max="90" step="0.5" value="31" />
+              </label>
+              <label class="slider">
+                <span>垂直位置 <b id="topVal">22px</b></span>
+                <input type="range" id="top" min="-400" max="900" step="1" value="22" />
+              </label>
+              <label class="slider">
+                <span>立绘高度 <b id="heightVal">907px</b></span>
+                <input type="range" id="height" min="160" max="2200" step="10" value="907" />
+              </label>
+              <label class="slider">
+                <span>最大宽度 <b id="widthVal">62%</b></span>
+                <input type="range" id="maxWidth" min="10" max="100" step="1" value="62" />
+              </label>
+            </div>
+            <div class="row">
+              <button class="btn primary" id="saveLayoutBtn" type="button">保存位置</button>
+              <button class="btn ghost danger" id="deleteCharBtn" type="button" hidden>删除当前角色</button>
+            </div>
+            <p class="tip">立绘按高度缩放，宽度自适应；不同尺寸的图片用这两个滑块调到人物不被对话框挡住、也不超出画面。</p>
+          </div>
+        </div>
+
+        <div class="section-head">
+          <h3>立绘与差分</h3>
+          <span class="muted">支持 PNG / JPG / WebP / GIF，单张 ≤ 12MB。未设置的表情会回退到“默认”。</span>
+        </div>
+        <div class="sprite-grid" id="spriteGrid"></div>
+      </section>
+
+      <section class="panel" id="panel-background" hidden>
+        <div class="section-head">
+          <h3>背景库</h3>
+          <div class="row">
+            <label class="btn small primary file-btn">
+              上传背景
+              <input type="file" id="backgroundUpload" accept="image/*" hidden />
+            </label>
+            <button class="btn small ghost" id="followBgBtn" type="button">跟随背景模式</button>
+          </div>
+        </div>
+        <div class="bg-grid" id="backgroundGrid"></div>
+        <div class="field narrow">
+          <label for="backgroundMode">背景模式</label>
+          <select id="backgroundMode">
+            <option value="session">本会话固定一张（推荐）</option>
+            <option value="random">每轮随机</option>
+            <option value="fixed">固定使用已选背景</option>
+          </select>
+        </div>
+        <p class="tip">选择“跟随背景模式”后，会话内会从背景库里选一张并保持；选具体背景则固定使用它。</p>
+      </section>
+
+      <section class="panel" id="panel-appearance" hidden>
+        <div class="form-grid">
+          <div class="field">
+            <label for="botLabel">角色名标签</label>
+            <input id="botLabel" maxlength="30" />
+          </div>
+          <div class="field">
+            <label for="freeHint">自由输入位文案</label>
+            <input id="freeHint" maxlength="40" />
+          </div>
+          <div class="field">
+            <label for="boxAlpha">对话框不透明度 <b id="alphaVal">0.94</b></label>
+            <input type="range" id="boxAlpha" min="0.2" max="1" step="0.01" value="0.94" />
+          </div>
+          <div class="field">
+            <label for="imageQuality">出图质量 <b id="qualityVal">90</b></label>
+            <input type="range" id="imageQuality" min="30" max="100" step="1" value="90" />
+          </div>
+          <div class="field">
+            <label for="renderEndpoint">文转图端点（可选，多个用逗号分隔）</label>
+            <input id="renderEndpoint" placeholder="留空使用 AstrBot 全局设置" />
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="saveSettingsBtn" type="button">保存外观</button>
+        </div>
+      </section>
+
+      <section class="panel prose" id="panel-help" hidden>
+        <h3>怎么用</h3>
+        <ol>
+          <li>在左侧「角色」里新建一个角色，先上传「默认」立绘，再给开心 / 兴奋 / 平静 / 难过 / 生气 / 惊讶 / 害羞 / 害怕 / 担心 / 疲惫 / 温柔 / 得意 / 困惑 / 无语 / 坏笑 / 感动 / 厌恶 / 好奇上传差分。</li>
+          <li>不是每个情绪都要单独一张图：在某个情绪卡片的「上传新图」下拉里选一张已经上传的立绘，就能让多个情绪共用同一张图。</li>
+          <li>拖动右侧滑块，让立绘的头和肩膀落在画面里、下半身被对话框自然挡住；点「保存位置」。</li>
+          <li>到「背景」上传自己的背景图，点选即可固定；也可以保留「跟随背景模式」。</li>
+          <li>「外观」里改角色名标签、自由输入位文案和对话框透明度。</li>
+          <li>内置角色只读，但位置可以调；想换自己的形象请新建角色。</li>
+        </ol>
+        <h3>文件放在哪</h3>
+        <p>资源在 <code>data/plugin_data/astrbot_plugin_gal_choice/</code>：<code>assets/characters/</code> 是角色差分，<code>assets/backgrounds/</code> 是背景。更新插件不会清空这个目录。</p>
+        <h3>排障</h3>
+        <p>如果预览一直转圈，先确认 AstrBot 的文转图服务正常；出图失败会在右侧提示。上传后如果没有立刻变化，点右上角「刷新状态」。</p>
+      </section>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+  <script defer src="./app.js"></script>
+</body>
+</html>
