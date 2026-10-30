@@ -18,8 +18,9 @@ LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 _EMO_RE = re.compile(r"<emo>(.*?)</emo>", re.S | re.I)
 _SAY_RE = re.compile(r"<say>(.*?)</say>", re.S | re.I)
+_LINE_RE = re.compile(r"<line>(.*?)</line>", re.S | re.I)
 _OPT_RE = re.compile(r"<opt>(.*?)</opt>", re.S | re.I)
-_KNOWN_TAG_RE = re.compile(r"</?(?:emo|say|opt|narration|narr)\b[^>]*>", re.I)
+_KNOWN_TAG_RE = re.compile(r"</?(?:emo|say|line|opt|narration|narr)\b[^>]*>", re.I)
 _ANY_TAG_RE = re.compile(r"</?[a-zA-Z][^>]{0,40}>")
 _CODE_FENCE_RE = re.compile(r"```[a-zA-Z0-9_+-]*\s*\n?")
 _INVIS_RE = re.compile(r"\[(?:MSG_ID|引用|CQ)[^\]]*\]|[\u200b\u200c\u200d\ufeff]")
@@ -50,11 +51,18 @@ _EMOTION_ALIASES = {
 
 
 @dataclass
+class GalLine:
+    say: str
+    emotion: str = ""
+
+
+@dataclass
 class GalTurn:
     say: str = ""
     options: list[str] = field(default_factory=list)
     emotion: str = ""
     raw: str = ""
+    lines: list[GalLine] = field(default_factory=list)
 
 
 @dataclass
@@ -212,6 +220,20 @@ def parse_gal_reply(text: str, option_max_units: float = 16.0) -> GalTurn:
                 if say or len(options) >= 2:
                     return GalTurn(say=say, options=options, emotion=emotion, raw=text or "")
 
+    # Multi-line format: <line><emo>...</emo><say>...</say></line>
+    lines: list[GalLine] = []
+    for block in _LINE_RE.findall(raw):
+        line_emo = ""
+        emo = _EMO_RE.search(block)
+        if emo:
+            line_emo = normalize_emotion(emo.group(1))
+        say_match = _SAY_RE.search(block)
+        if say_match:
+            line_say = _clean_say(say_match.group(1))
+            if line_say:
+                lines.append(GalLine(say=line_say, emotion=line_emo))
+    raw = _LINE_RE.sub("", raw)
+
     emotion = ""
     emo_match = _EMO_RE.search(raw)
     if emo_match:
@@ -249,7 +271,10 @@ def parse_gal_reply(text: str, option_max_units: float = 16.0) -> GalTurn:
 
     if not options:
         say = _clean_say(_ANY_TAG_RE.sub("", text or ""))
-    return GalTurn(say=say, options=options, emotion=emotion, raw=text or "")
+    if lines:
+        say = " ".join(item.say for item in lines)
+        emotion = lines[-1].emotion or lines[0].emotion or emotion
+    return GalTurn(say=say, options=options, emotion=emotion, raw=text or "", lines=lines)
 
 
 def normalize_text(text: str) -> str:

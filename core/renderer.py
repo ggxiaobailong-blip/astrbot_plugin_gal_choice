@@ -158,6 +158,7 @@ class Renderer:
         speaker: str,
         user_id: str,
         layout: dict | None = None,
+        lines: list | None = None,
     ) -> tuple[str, dict]:
         profile = self.assets.active()
         layout = normalize_layout(layout if layout is not None else profile.layout)
@@ -181,17 +182,48 @@ class Renderer:
         )
 
         default_say = self.config.str("default_say", "这几个方向，你想先聊哪个？")
-        say_text = fit_text(
-            (say or "").strip() or default_say,
-            self.config.float("say_max_units", 46.0, 8, 80),
-        )
-        units = display_units(say_text)
+        max_lines = self.config.int("dialogue_max_lines", 3, 1, 3)
+        source_lines = lines or [(say, emotion)]
+        prepared: list[dict] = []
+        for item in source_lines[:max_lines]:
+            if isinstance(item, (tuple, list)):
+                line_say, line_emotion = item[0], (item[1] if len(item) > 1 else "")
+            else:
+                line_say = getattr(item, "say", "")
+                line_emotion = getattr(item, "emotion", "")
+            line_text = fit_text(
+                str(line_say or "").strip(),
+                self.config.float("say_max_units", 46.0, 8, 80),
+            )
+            if line_text:
+                prepared.append({"text": line_text, "emotion": line_emotion})
+        if not prepared:
+            prepared = [{"text": fit_text(default_say, 46.0), "emotion": ""}]
+
         base_font = self.config.int("say_font_size", 26, 18, 34)
-        say_font = base_font
-        if units > 42:
-            say_font = max(20, base_font - 2)
-        if units > 56:
-            say_font = max(18, base_font - 4)
+        if len(prepared) == 1:
+            single_units = display_units(prepared[0]["text"])
+            fonts = [base_font]
+            if single_units > 36:
+                fonts = [max(20, base_font - 2)]
+            if single_units > 44:
+                fonts = [max(18, base_font - 4)]
+        elif len(prepared) == 2:
+            fonts = [max(20, base_font - 3)] * 2
+        else:
+            fonts = [max(20, base_font - 4)] + [max(18, base_font - 6)] * (len(prepared) - 1)
+        total_units = sum(display_units(item["text"]) for item in prepared)
+        shrink = 0
+        if total_units > 54:
+            shrink = 1
+        if total_units > 72:
+            shrink = 2
+        fonts = [max(17, font - shrink) for font in fonts]
+        for item, font in zip(prepared, fonts):
+            item["font"] = font
+
+        say_text = " ".join(item["text"] for item in prepared)
+        say_font = fonts[0]
 
         option_max = min(20.0, self.config.float("option_max_units", 16.0, 4, 30))
         items: list[dict] = []
@@ -244,6 +276,7 @@ class Renderer:
             "bot_label": fit_text(self.config.str("bot_label", "小鲸鱼"), 14),
             "say": say_text,
             "say_font": say_font,
+            "lines": prepared,
             "options": items,
             "opt_header_top": max(0, top_start - 28),
             "show_icons": self.config.bool("show_icons", True),

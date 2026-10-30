@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.2 - 2026-10-30
+
+- 修复插件未出现在 WebUI 插件列表的问题：移除错误的 `@register` 装饰位置，改为主类 `GalChoicePlugin` 自动识别，WebUI 可正常看到插件和配置页。
+- 内置防抖不再对 `reply_merge` 自动让位：gal 插件自身完整负责防抖，新用户不需要额外安装防抖插件；README 提示不要同时启用外部防抖。
+- 防抖逻辑保持按用户合并、静默 1 秒、最长 5 秒，支持主消息选项匹配 + 补充消息上下文。
+
+## 0.4.1 - 2026-10-30
+
+- 新增 gal 模式内置防抖：同一用户连续消息在 `on_waiting_llm_request` 阶段合并，后续消息 donate 后 `stop_event`，只请求一次模型。
+- 新增 `gal_debounce_enabled`、`gal_debounce_seconds`（默认 1.0s）、`gal_debounce_max_seconds`（默认 5s）以及 WebUI「外观」控件。
+- 合并后的主消息用于选项匹配，补充消息作为同一轮上下文追加到 prompt；退出判断会同时检查主消息和补充消息。
+- 检测到外部 `astrbot_plugin_reply_merge` 防抖时内置防抖自动让位，避免双重合并冲突。
+- 旧 AstrBot 没有 waiting hook 时自动跳过内置防抖，不影响插件加载。
+
+## 0.4.0 - 2026-10-30
+
+- P0 多行对话：模型可用 2~3 个 `<line><emo>...</emo><say>...</say></line>` 输出连续台词；一张 1280×720 图内自适应排版，不额外增加 T2I 次数。
+- 单图多行模板：首行显示角色名，后续行共享缩进；字号按 1/2/3 行和总字数自动收缩，最低 17px。
+- 多行语音：每句独立 FishAudio 合成（保留各自情绪标签），按 `voice_line_gap_ms`（默认 1000ms）插入静音，再合成一条语音发送。
+- 新增 `dialogue_max_lines`、`voice_line_gap_ms` 配置和 WebUI「外观」控件。
+- 旧版单行 `<emo><say>` 格式继续兼容。
+
 ## 0.3.11 - 2026-10-30
 
 - 修复 QQ 语音仍然被转成 WAV 的问题：AstrBot 的 `Record.convert_to_base64()` 会强制 `target_format="wav"`，把预转的 SILK 又转回 WAV，导致 NapCat 的 ntsilk 编码器报错。

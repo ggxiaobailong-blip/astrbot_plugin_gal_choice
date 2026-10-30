@@ -164,6 +164,29 @@
             <input type="range" id="imageQuality" min="30" max="100" step="1" value="90" />
           </div>
           <div class="field">
+            <label for="dialogueMaxLines">单图最多对话行数</label>
+            <select id="dialogueMaxLines">
+              <option value="1">1 行</option>
+              <option value="2">2 行</option>
+              <option value="3" selected>3 行</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="voiceLineGap">多行语音句间停顿 <b id="gapVal">1000ms</b></label>
+            <input type="range" id="voiceLineGap" min="0" max="2500" step="100" value="1000" />
+          </div>
+          <div class="field">
+            <label class="check-row"><input type="checkbox" id="debounceEnabled" /> gal 模式内置防抖</label>
+          </div>
+          <div class="field">
+            <label for="debounceSeconds">防抖静默时间 <b id="debounceVal">1.0s</b></label>
+            <input type="range" id="debounceSeconds" min="0.2" max="5" step="0.1" value="1" />
+          </div>
+          <div class="field">
+            <label for="debounceMax">防抖最长等待 <b id="debounceMaxVal">5s</b></label>
+            <input type="range" id="debounceMax" min="1" max="15" step="0.5" value="5" />
+          </div>
+          <div class="field">
             <label for="renderEndpoint">文转图端点（可选，多个用逗号分隔）</label>
             <input id="renderEndpoint" placeholder="留空使用 AstrBot 全局设置" />
           </div>

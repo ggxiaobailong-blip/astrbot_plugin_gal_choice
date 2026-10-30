@@ -50,6 +50,22 @@ class ParserTest(unittest.TestCase):
         turn = parse_gal_reply("<emo>开心</emo><say>好耶</say><opt>继续</opt><opt>等等</opt>")
         self.assertEqual(turn.emotion, "笑")
 
+    def test_multiline_reply(self):
+        turn = parse_gal_reply(
+            "<line><emo>平静</emo><say>你终于来了。</say></line>"
+            "<line><emo>难过</emo><say>我还以为你今天不会来。</say></line>"
+            "<line><emo>开心</emo><say>算了，先坐下吧。</say></line>"
+            "<opt>解释迟到</opt><opt>认真道歉</opt>"
+        )
+        self.assertEqual([item.say for item in turn.lines], [
+            "你终于来了。",
+            "我还以为你今天不会来。",
+            "算了，先坐下吧。",
+        ])
+        self.assertEqual([item.emotion for item in turn.lines], ["平静", "难过", "笑"])
+        self.assertEqual(turn.options, ["解释迟到", "认真道歉"])
+        self.assertTrue(turn.say)
+
     def test_no_options_returns_text(self):
         turn = parse_gal_reply("今天天气不错。")
         self.assertEqual(turn.options, [])

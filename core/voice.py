@@ -10,6 +10,7 @@ import random
 import re
 import shutil
 import time
+import wave
 from pathlib import Path
 
 from astrbot.api.event import MessageChain
@@ -197,7 +198,78 @@ class VoiceService:
             logger.warning("[gal] 保存 silk 失败: %s", exc)
             return None
 
-    async def speak(self, event, text: str, emotion: str, session) -> None:
+    async def _merge_audio(self, paths: list[str], gap_ms: int) -> str | None:
+        cache = plugin_data_dir(_PLUGIN_NAME) / "voice_cache"
+        cache.mkdir(parents=True, exist_ok=True)
+        token = f"{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
+        ffmpeg = shutil.which("ffmpeg") or "/usr/local/bin/ffmpeg"
+        normalized: list[Path] = []
+        for index, src in enumerate(paths, 1):
+            if src.startswith("http://") or src.startswith("https://"):
+                logger.warning("[gal] 语音行返回网络音频，无法合并: %s", src)
+                continue
+            source = Path(src)
+            if not source.is_file():
+                logger.warning("[gal] 语音行文件不存在: %s", source)
+                continue
+            target = cache / f"line_{token}_{index}.wav"
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    ffmpeg,
+                    "-v",
+                    "error",
+                    "-y",
+                    "-i",
+                    str(source),
+                    "-ar",
+                    "24000",
+                    "-ac",
+                    "1",
+                    "-sample_fmt",
+                    "s16",
+                    str(target),
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                _, err = await asyncio.wait_for(proc.communicate(), timeout=30)
+                if proc.returncode != 0 or not target.is_file():
+                    logger.warning("[gal] 语音行转 PCM 失败: %s", (err or b"")[:200])
+                    continue
+                normalized.append(target)
+            except Exception as exc:
+                logger.warning("[gal] 语音行转 PCM 异常: %s", exc)
+        if not normalized:
+            return None
+        if len(normalized) == 1:
+            return str(normalized[0])
+
+        merged = cache / f"merged_{token}.wav"
+        with wave.open(str(normalized[0]), "rb") as first:
+            params = first.getparams()
+        silence = b"\x00" * int(
+            params.framerate
+            * params.nchannels
+            * params.sampwidth
+            * max(0, gap_ms)
+            / 1000
+        )
+        with wave.open(str(merged), "wb") as out:
+            out.setnchannels(params.nchannels)
+            out.setsampwidth(params.sampwidth)
+            out.setframerate(params.framerate)
+            for index, path in enumerate(normalized):
+                with wave.open(str(path), "rb") as inp:
+                    out.writeframes(inp.readframes(inp.getnframes()))
+                if index < len(normalized) - 1:
+                    out.writeframes(silence)
+        return str(merged)
+
+    async def speak(self, event, lines, session=None) -> None:
+        # Backward compatibility for a single string + emotion tuple.
+        if isinstance(lines, str):
+            lines = [(lines, "")]
+        if session is None:
+            return
         enabled = (
             session.voice_enabled
             if isinstance(session.voice_enabled, bool)
@@ -208,8 +280,17 @@ class VoiceService:
         if random.random() > self.config.float("voice_probability", 1.0, 0.0, 1.0):
             return
 
-        body = clean_voice_text(text)
-        if not body:
+        items: list[tuple[str, str]] = []
+        for item in lines or []:
+            if isinstance(item, (tuple, list)):
+                say, emotion = item[0], (item[1] if len(item) > 1 else "")
+            else:
+                say = getattr(item, "say", "")
+                emotion = getattr(item, "emotion", "")
+            body = clean_voice_text(str(say or ""))
+            if body:
+                items.append((body, str(emotion or "")))
+        if not items:
             return
 
         provider = self._provider(event.unified_msg_origin)
@@ -217,17 +298,34 @@ class VoiceService:
             logger.info("[gal] 没有可用的 TTS 提供商，跳过配音")
             return
 
-        tag = self._emotion_tag(provider, emotion)
-        payload = f"{tag} {body}".strip() if tag else body
-        try:
-            audio = await asyncio.wait_for(provider.get_audio(payload), timeout=_TTS_TIMEOUT)
-        except Exception as exc:
-            logger.warning("[gal] TTS 生成失败: %s", exc)
+        async def synth(body: str, emotion: str) -> str:
+            tag = self._emotion_tag(provider, emotion)
+            payload = f"{tag} {body}".strip() if tag else body
+            return await asyncio.wait_for(provider.get_audio(payload), timeout=_TTS_TIMEOUT)
+
+        results = await asyncio.gather(
+            *(synth(body, emotion) for body, emotion in items),
+            return_exceptions=True,
+        )
+        paths: list[str] = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.warning("[gal] 单行 TTS 失败: %s", result)
+            elif result:
+                paths.append(str(result))
+        if not paths:
+            logger.warning("[gal] TTS 没有返回可用音频")
             return
-        if not audio:
-            logger.warning("[gal] TTS 返回空音频: %s", body[:30])
-            return
-        audio = str(audio)
+
+        body_text = " ".join(body for body, _ in items)
+        if len(paths) == 1:
+            audio = paths[0]
+        else:
+            gap_ms = self.config.int("voice_line_gap_ms", 1000, 0, 2500)
+            audio = await self._merge_audio(paths, gap_ms)
+            if not audio:
+                logger.warning("[gal] 多行语音合并失败，跳过本次配音")
+                return
 
         platform = (event.get_platform_name() or "").lower()
         umo = event.unified_msg_origin or ""
@@ -244,21 +342,23 @@ class VoiceService:
                 record = _SilkRecord(
                     file=path.as_uri(),
                     path=str(path),
-                    text=body,
+                    text=body_text,
                 )
             elif audio.startswith("http://") or audio.startswith("https://"):
-                record = Record.fromURL(audio, text=body)
+                record = Record.fromURL(audio, text=body_text)
             else:
-                record = Record.fromFileSystem(audio, text=body)
+                record = Record.fromFileSystem(audio, text=body_text)
             await self.context.send_message(
                 event.unified_msg_origin,
                 MessageChain([record]),
             )
             logger.info(
-                "[gal] 配音已发送 %s 字（%s，platform=%s）",
-                len(body),
-                "silk" if is_qq else "原始音频",
+                "[gal] 配音已发送 %s 行/%s 字（%s，platform=%s）",
+                len(paths),
+                len(body_text),
+                "silk" if is_qq else "合并音频",
                 platform or "?",
             )
         except Exception as exc:
             logger.warning("[gal] 配音发送失败: %s", exc)
+

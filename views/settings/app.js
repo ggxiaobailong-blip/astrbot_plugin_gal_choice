@@ -296,6 +296,14 @@ function renderSettings() {
   $("#alphaVal").textContent = Number($("#boxAlpha").value).toFixed(2);
   $("#imageQuality").value = settings.image_quality ?? 90;
   $("#qualityVal").textContent = $("#imageQuality").value;
+  $("#dialogueMaxLines").value = String(settings.dialogue_max_lines ?? 3);
+  $("#voiceLineGap").value = settings.voice_line_gap_ms ?? 1000;
+  $("#gapVal").textContent = `${$("#voiceLineGap").value}ms`;
+  $("#debounceEnabled").checked = settings.gal_debounce_enabled ?? true;
+  $("#debounceSeconds").value = settings.gal_debounce_seconds ?? 1;
+  $("#debounceVal").textContent = `${Number($("#debounceSeconds").value).toFixed(1)}s`;
+  $("#debounceMax").value = settings.gal_debounce_max_seconds ?? 5;
+  $("#debounceMaxVal").textContent = `${Number($("#debounceMax").value).toFixed(1)}s`;
   $("#renderEndpoint").value = settings.render_endpoint || "";
   $("#backgroundMode").value = state.background_mode || "session";
 }
@@ -386,6 +394,11 @@ async function saveSettings() {
       free_option_hint: $("#freeHint").value,
       box_alpha: Number($("#boxAlpha").value),
       image_quality: Number($("#imageQuality").value),
+      dialogue_max_lines: Number($("#dialogueMaxLines").value),
+      voice_line_gap_ms: Number($("#voiceLineGap").value),
+      gal_debounce_enabled: $("#debounceEnabled").checked,
+      gal_debounce_seconds: Number($("#debounceSeconds").value),
+      gal_debounce_max_seconds: Number($("#debounceMax").value),
       render_endpoint: $("#renderEndpoint").value.trim(),
       background_mode: $("#backgroundMode").value,
     });
@@ -526,6 +539,15 @@ function bindEvents() {
   $("#boxAlpha").addEventListener("change", () => queuePreview(0));
   $("#imageQuality").addEventListener("input", () => {
     $("#qualityVal").textContent = $("#imageQuality").value;
+  });
+  $("#voiceLineGap").addEventListener("input", () => {
+    $("#gapVal").textContent = `${$("#voiceLineGap").value}ms`;
+  });
+  $("#debounceSeconds").addEventListener("input", () => {
+    $("#debounceVal").textContent = `${Number($("#debounceSeconds").value).toFixed(1)}s`;
+  });
+  $("#debounceMax").addEventListener("input", () => {
+    $("#debounceMaxVal").textContent = `${Number($("#debounceMax").value).toFixed(1)}s`;
   });
   $("#previewSay").addEventListener("input", () => queuePreview());
   $("#previewQuote").addEventListener("input", () => queuePreview());

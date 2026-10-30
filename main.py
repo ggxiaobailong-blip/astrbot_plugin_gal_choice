@@ -15,13 +15,14 @@ import time
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.message_components import Image, Plain
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star
 
 if __package__:
     from .core.assets import AssetStore
     from .core.config import PluginConfig, plugin_data_dir
     from .core.parser import (
         LETTERS,
+        GalLine,
         OptionMatch,
         clean_message,
         is_exit_intent,
@@ -52,6 +53,7 @@ else:  # pragma: no cover - only used when running the file directly
     from core.config import PluginConfig, plugin_data_dir
     from core.parser import (
         LETTERS,
+        GalLine,
         OptionMatch,
         clean_message,
         is_exit_intent,
@@ -82,8 +84,15 @@ PLUGIN_NAME = "astrbot_plugin_gal_choice"
 _GENERIC_START = ("开始", "来吧", "随便", "你决定", "都行", "继续")
 
 
-@register(PLUGIN_NAME, "iv小白龙", "GalGame 选项成图 + 配音 + 资源工作台", "0.3.11")
-class GalChoice(Star):
+def _on_waiting_llm_request():
+    """Use the waiting hook when available; older/local stubs may lack it."""
+    decorator = getattr(filter, "on_waiting_llm_request", None)
+    if callable(decorator):
+        return decorator()
+    return lambda fn: fn
+
+
+class GalChoicePlugin(Star):
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
         self.config = PluginConfig(config)
@@ -98,9 +107,11 @@ class GalChoice(Star):
         self.voice = VoiceService(context, self.config)
         self.webui = GalWebUI(self, self.assets, self.renderer, self.config)
         self.webui.register()
-        self._pending_voice: dict[str, tuple[str, str, float]] = {}
+        self._pending_voice: dict[str, tuple[list, float]] = {}
         self._locks: dict[str, asyncio.Lock] = {}
         self._provider_warned: set[str] = set()
+        self._debounce_windows: dict[str, dict] = {}
+        self._warn_external_debounce()
 
     # ---------- 基础 ----------
 
@@ -402,6 +413,71 @@ class GalChoice(Star):
         except Exception as exc:
             logger.error("[gal] 闸门判断失败: %s", exc, exc_info=True)
 
+    def _warn_external_debounce(self) -> None:
+        try:
+            for star in self.context.get_all_stars():
+                if (
+                    getattr(star, "name", "") == "astrbot_plugin_reply_merge"
+                    and getattr(star, "activated", False)
+                ):
+                    logger.warning(
+                        "[gal] 检测到外部 reply_merge 同时启用；本插件已内置防抖，"
+                        "请关闭 reply_merge，避免同一轮被合并两次"
+                    )
+                    return
+        except Exception:
+            pass
+
+
+    @_on_waiting_llm_request()
+    async def gal_debounce(self, event: AstrMessageEvent):
+        """Merge consecutive gal messages from one user into one LLM request."""
+        if not self.config.bool("gal_debounce_enabled", True):
+            return
+        key = self._key(event)
+        session = self.store.get(key)
+        if session is None or session.mode != "gal":
+            return
+        if event.get_result() is not None:
+            return
+        text = self._trigger_text(event)
+        if not text or text.startswith("/"):
+            return
+        self_id = str(event.get_self_id() or "")
+        if self_id and str(event.get_sender_id() or "") == self_id:
+            return
+
+        now = time.monotonic()
+        window = self._debounce_windows.get(key)
+        if window is not None:
+            window["texts"].append(text)
+            window["last"] = now
+            event.stop_event()
+            return
+
+        window = {"texts": [text], "start": now, "last": now}
+        self._debounce_windows[key] = window
+        quiet = self.config.float("gal_debounce_seconds", 1.0, 0.2, 5.0)
+        max_wait = self.config.float("gal_debounce_max_seconds", 5.0, 1.0, 15.0)
+        try:
+            while True:
+                await asyncio.sleep(0.15)
+                now = time.monotonic()
+                if now - window["last"] >= quiet or now - window["start"] >= max_wait:
+                    break
+                current = self.store.get(key)
+                if current is None or current.mode != "gal":
+                    break
+        finally:
+            self._debounce_windows.pop(key, None)
+
+        texts = window["texts"]
+        event.set_extra("_gal_primary_text", texts[0])
+        event.set_extra("_gal_followups", texts[1:])
+        event.set_extra("_gal_merged_text", " ".join(texts))
+        if len(texts) > 1:
+            logger.info("[gal] 防抖合并 %s 条消息 key=%s", len(texts), key)
+
     # ---------- 注入格式要求 / 处理选择 ----------
 
     def _append_system(self, req, hints: list[str]) -> None:
@@ -419,10 +495,11 @@ class GalChoice(Star):
             if session is None or session.mode != "gal":
                 return
 
-            text = self._trigger_text(event)
+            text = event.get_extra("_gal_primary_text") or self._trigger_text(event)
+            followups = event.get_extra("_gal_followups") or []
             hints: list[str] = []
 
-            if text and is_exit_intent(text, self._exit_words()):
+            if text and is_exit_intent(" ".join([text, *followups]), self._exit_words()):
                 await self._exit(event, session)
                 hints.append(EXIT_HINT)
                 await self.store.save()
@@ -458,6 +535,12 @@ class GalChoice(Star):
 
             if session.history:
                 hints.append("前几幕的选择：" + "；".join(session.history[-5:]) + "。保持剧情连续。")
+            if followups:
+                hints.append(
+                    "玩家在你回复前又连续补充了："
+                    + " / ".join(followups)
+                    + "。把这些和主消息看成同一轮，先回应补充内容，再给新选项。"
+                )
             hints.append(
                 f"你就是「{self._bot_label()}」本人，用这个身份直接对玩家说话；"
                 "所有 <say> 必须是你开口说出的台词，禁止旁白、小说叙述、动作/环境描写；"
@@ -544,7 +627,11 @@ class GalChoice(Star):
 
             async with self._lock_for(key):
                 session.turn_id += 1
-                quote = event.get_extra("gal_quote") or clean_message(event.message_str).strip()
+                quote = (
+                    event.get_extra("gal_quote")
+                    or event.get_extra("_gal_merged_text")
+                    or clean_message(event.message_str).strip()
+                )
                 try:
                     template, data = self.renderer.build(
                         session=session,
@@ -554,6 +641,7 @@ class GalChoice(Star):
                         emotion=parsed.emotion,
                         speaker=event.get_sender_name() or "",
                         user_id=str(event.get_sender_id() or ""),
+                        lines=parsed.lines or None,
                     )
                     image = await render_image(
                         self,
@@ -596,13 +684,19 @@ class GalChoice(Star):
                 session.touch()
                 await self.store.save()
 
-                if parsed.say:
-                    self._pending_voice[key] = (parsed.say, parsed.emotion, time.time())
+                if parsed.lines:
+                    self._pending_voice[key] = (parsed.lines, time.time())
+                elif parsed.say:
+                    self._pending_voice[key] = (
+                        [GalLine(say=parsed.say, emotion=parsed.emotion)],
+                        time.time(),
+                    )
                 logger.info(
-                    "[gal] 出图完成 key=%s turn=%s options=%s emotion=%s",
+                    "[gal] 出图完成 key=%s turn=%s options=%s lines=%s emotion=%s",
                     key,
                     session.turn_id,
                     len(session.options),
+                    len(parsed.lines) or 1,
                     parsed.emotion or "默认",
                 )
         except Exception as exc:
@@ -618,13 +712,13 @@ class GalChoice(Star):
             item = self._pending_voice.pop(key, None)
             if not item:
                 return
-            say, emotion, created_at = item
+            lines, created_at = item
             if time.time() - created_at > 120:
                 return
             session = self.store.get(key)
             if session is None or session.mode != "gal":
                 return
-            await self.voice.speak(event, say, emotion, session)
+            await self.voice.speak(event, lines, session)
         except Exception as exc:
             logger.warning("[gal] 配音发送失败: %s", exc)
 
@@ -655,3 +749,8 @@ class GalChoice(Star):
             logger.warning("[gal] 终止时保存状态失败: %s", exc)
         self._locks.clear()
         self._pending_voice.clear()
+        self._debounce_windows.clear()
+
+
+# Backward-compatible alias for tests / external imports.
+GalChoice = GalChoicePlugin

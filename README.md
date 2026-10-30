@@ -23,6 +23,8 @@
 - **会话级模型**：`/gal model <provider_id>` 指定 gal 模式用哪个模型，退出时恢复原模型。
 - **背景连续**：默认一个会话固定一张背景，不会每轮跳来跳去；可切换为随机或固定。
 - **角色视角**：台词强制为角色第一人称直接对玩家说的话，禁止旁白、小说叙述、动作/环境/心理描写；选项也要求是玩家能直接说出口的回应。
+- **单图多行**：一轮可输出 2~3 行连续台词，仍只生成一张 1280×720 图；多行语音按句合成、插入可配置静音后合并成一条语音。
+- **内置防抖**：gal 模式下同一用户连续发来的几条消息会合并成一轮再请求模型，不需要额外装防抖插件。**本插件已包含完整防抖能力，请不要再同时启用 `reply_merge` 等外部防抖插件**；如果服务器上已经装了，请在 WebUI 里关闭它，否则同一轮可能被合并两次。
 - **失败可降级**：模型没按格式输出或 T2I 出图失败时，发可读的文字选项，不会把 `<say><opt>` 原样吐给玩家。
 - **数据安全**：状态放在 `data/plugin_data/`，带 TTL、原子写和并发锁；不会因为更新插件丢档。
 
@@ -151,7 +153,12 @@ data/plugin_data/astrbot_plugin_gal_choice/
 | `option_ttl` | int | `600` | 选项有效秒数 |
 | `bot_label` | string | `小鲸鱼` | 台词框前的名字标签 |
 | `default_say` | string | `这几个方向，你想先聊哪个？` | 台词为空时的兜底 |
-| `say_max_units` | float | `46` | 台词字数上限（中文算 1，半角约 0.55） |
+| `say_max_units` | float | `46` | 单行台词字数上限（中文算 1，半角约 0.55） |
+| `dialogue_max_lines` | int | `3` | 单图最多对话行数（1~3） |
+| `voice_line_gap_ms` | int | `1000` | 多行语音每句之间的静音毫秒数 |
+| `gal_debounce_enabled` | bool | `true` | gal 模式内置防抖 |
+| `gal_debounce_seconds` | float | `1.0` | 最后一条消息后的静默等待 |
+| `gal_debounce_max_seconds` | float | `5.0` | 连续输入时最长等待 |
 | `option_max_units` | float | `16` | 选项字数上限 |
 | `free_option_hint` | string | `✎ 自己说点什么…` | 自由输入位文案，字母位固定为 0 |
 | `free_input_enabled` | bool | `true` | 是否显示自由输入位 |

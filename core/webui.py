@@ -246,6 +246,32 @@ class GalWebUI:
                 if item and not item.startswith(("http://", "https://")):
                     return error_response("文转图端点必须是 http(s) 地址", status_code=400)
             self.config.set("render_endpoint", endpoint)
+        if "dialogue_max_lines" in payload:
+            try:
+                lines = max(1, min(3, int(payload.get("dialogue_max_lines"))))
+            except (TypeError, ValueError):
+                lines = self.config.int("dialogue_max_lines", 3, 1, 3)
+            self.config.set("dialogue_max_lines", lines)
+        if "voice_line_gap_ms" in payload:
+            try:
+                gap = max(0, min(2500, int(payload.get("voice_line_gap_ms"))))
+            except (TypeError, ValueError):
+                gap = self.config.int("voice_line_gap_ms", 1000, 0, 2500)
+            self.config.set("voice_line_gap_ms", gap)
+        if "gal_debounce_enabled" in payload:
+            self.config.set("gal_debounce_enabled", bool(payload.get("gal_debounce_enabled")))
+        if "gal_debounce_seconds" in payload:
+            try:
+                seconds = max(0.2, min(5.0, float(payload.get("gal_debounce_seconds"))))
+            except (TypeError, ValueError):
+                seconds = self.config.float("gal_debounce_seconds", 1.0, 0.2, 5.0)
+            self.config.set("gal_debounce_seconds", seconds)
+        if "gal_debounce_max_seconds" in payload:
+            try:
+                seconds = max(1.0, min(15.0, float(payload.get("gal_debounce_max_seconds"))))
+            except (TypeError, ValueError):
+                seconds = self.config.float("gal_debounce_max_seconds", 5.0, 1.0, 15.0)
+            self.config.set("gal_debounce_max_seconds", seconds)
         if "background_mode" in payload:
             mode = str(payload.get("background_mode") or "session")
             if mode not in {"session", "random", "fixed"}:

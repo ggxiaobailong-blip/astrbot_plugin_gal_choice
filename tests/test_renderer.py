@@ -35,13 +35,28 @@ class RendererTest(unittest.TestCase):
 
     def test_build_shape(self):
         template, data = self.build()
-        self.assertIn("{{ say|e }}", template)
+        self.assertIn("line-text", template)
         self.assertIn("object-fit: contain", template)
         self.assertIn("char-box", template)
         self.assertEqual(data["speaker"], "阿岚")
         self.assertEqual(len(data["options"]), 4)
         self.assertEqual(data["options"][-1]["letter"], "0")
         self.assertTrue(data["options"][-1]["cls"])
+        self.assertEqual(len(data["lines"]), 1)
+
+    def test_multiline_lines(self):
+        from core.parser import GalLine
+
+        _, data = self.build(
+            lines=[
+                GalLine("你终于来了。", "平静"),
+                GalLine("我还以为你今天不会来。", "难过"),
+                GalLine("算了，先坐下吧。", "开心"),
+            ]
+        )
+        self.assertEqual(len(data["lines"]), 3)
+        self.assertTrue(all(item["font"] >= 17 for item in data["lines"]))
+        self.assertEqual(data["lines"][0]["text"], "你终于来了。")
 
     def test_custom_layout_is_used(self):
         profile = self.assets.create("自定义")
@@ -62,7 +77,7 @@ class RendererTest(unittest.TestCase):
     def test_long_say_shrinks_font(self):
         _, data = self.build(say="这是一段非常长的台词" * 8)
         self.assertLess(data["say_font"], 26)
-        self.assertTrue(data["say"].endswith("…"))
+        self.assertTrue(data["lines"][0]["text"].endswith("…"))
 
     def test_custom_free_hint_fits(self):
         config = PluginConfig(

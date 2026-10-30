@@ -621,5 +621,10 @@ class AssetStore:
                 "box_alpha": self.config.float("box_alpha", 0.94, 0.2, 1.0),
                 "image_quality": self.config.int("image_quality", 90, 30, 100),
                 "render_endpoint": self.config.str("render_endpoint", ""),
+                "dialogue_max_lines": self.config.int("dialogue_max_lines", 3, 1, 3),
+                "voice_line_gap_ms": self.config.int("voice_line_gap_ms", 1000, 0, 2500),
+                "gal_debounce_enabled": self.config.bool("gal_debounce_enabled", True),
+                "gal_debounce_seconds": self.config.float("gal_debounce_seconds", 1.0, 0.2, 5.0),
+                "gal_debounce_max_seconds": self.config.float("gal_debounce_max_seconds", 5.0, 1.0, 15.0),
             },
         }
