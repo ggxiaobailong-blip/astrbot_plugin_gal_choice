@@ -82,7 +82,7 @@ PLUGIN_NAME = "astrbot_plugin_gal_choice"
 _GENERIC_START = ("开始", "来吧", "随便", "你决定", "都行", "继续")
 
 
-@register(PLUGIN_NAME, "iv小白龙", "GalGame 选项成图 + 配音 + 资源工作台", "0.3.9")
+@register(PLUGIN_NAME, "iv小白龙", "GalGame 选项成图 + 配音 + 资源工作台", "0.3.10")
 class GalChoice(Star):
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
@@ -459,7 +459,8 @@ class GalChoice(Star):
             if session.history:
                 hints.append("前几幕的选择：" + "；".join(session.history[-5:]) + "。保持剧情连续。")
             hints.append(
-                f"你的角色名是「{self._bot_label()}」，用这个身份说话，"
+                f"你就是「{self._bot_label()}」本人，用这个身份直接对玩家说话；"
+                "所有 <say> 必须是你开口说出的台词，禁止旁白、小说叙述、动作/环境描写；"
                 "不要称呼玩家为“用户”，也不要跳出角色解释规则。"
             )
             hints.append(GAL_RULES)
