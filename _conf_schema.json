@@ -87,42 +87,84 @@
   },
   "emotion_map": {
     "type": "dict",
-    "description": "表情 → 立绘文件",
-    "hint": "键是 <emo> 标签里的词，值是 assets 下的相对路径。",
+    "description": "表情 → 立绘文件（内置角色）",
+    "hint": "键是视觉情绪组，值是 assets 下的相对路径。自定义角色请在资源工作台上传。",
     "items": {},
     "template_schema": {
-      "笑": {
-        "name": "笑",
+      "happy": {
+        "name": "开心",
         "type": "string",
         "default": "whale_girl_moe.webp"
       },
-      "生气": {
+      "angry": {
         "name": "生气",
         "type": "string",
         "default": "emotions/angry.webp"
       },
-      "皱眉": {
-        "name": "皱眉",
-        "type": "string",
-        "default": "emotions/frown.webp"
-      },
-      "惊讶": {
+      "surprised": {
         "name": "惊讶",
         "type": "string",
         "default": "emotions/surprised.webp"
       },
-      "忍耐": {
-        "name": "忍耐",
+      "calm": {
+        "name": "平静",
+        "type": "string",
+        "default": "whale_girl_moe.webp"
+      },
+      "sad": {
+        "name": "难过",
+        "type": "string",
+        "default": "emotions/teary.webp"
+      },
+      "shy": {
+        "name": "害羞",
+        "type": "string",
+        "default": "emotions/blank.webp"
+      },
+      "tired": {
+        "name": "疲惫",
+        "type": "string",
+        "default": "emotions/frown.webp"
+      },
+      "worried": {
+        "name": "担心",
+        "type": "string",
+        "default": "emotions/blank.webp"
+      },
+      "moved": {
+        "name": "感动",
+        "type": "string",
+        "default": "emotions/blank.webp"
+      },
+      "confused": {
+        "name": "困惑",
+        "type": "string",
+        "default": "emotions/frown.webp"
+      },
+      "indifferent": {
+        "name": "无语",
+        "type": "string",
+        "default": "emotions/frown.webp"
+      },
+      "scared": {
+        "name": "害怕",
         "type": "string",
         "default": "emotions/endure.webp"
       }
     },
     "default": {
-      "笑": "whale_girl_moe.webp",
-      "生气": "emotions/angry.webp",
-      "皱眉": "emotions/frown.webp",
-      "惊讶": "emotions/surprised.webp",
-      "忍耐": "emotions/endure.webp"
+      "happy": "whale_girl_moe.webp",
+      "angry": "emotions/angry.webp",
+      "surprised": "emotions/surprised.webp",
+      "calm": "whale_girl_moe.webp",
+      "sad": "emotions/teary.webp",
+      "shy": "emotions/blank.webp",
+      "tired": "emotions/frown.webp",
+      "worried": "emotions/blank.webp",
+      "moved": "emotions/blank.webp",
+      "confused": "emotions/frown.webp",
+      "indifferent": "emotions/frown.webp",
+      "scared": "emotions/endure.webp"
     }
   },
   "background_file": {

@@ -11,17 +11,26 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .emotions import EMOTION_IDS
+
 PLUGIN_DIR = Path(__file__).resolve().parent.parent
 ASSETS_DIR = PLUGIN_DIR / "assets"
 BACKGROUND_DIR = PLUGIN_DIR / "background"
 TEMPLATE_DIR = PLUGIN_DIR / "templates"
 
 DEFAULT_EMOTION_MAP = {
-    "笑": "whale_girl_moe.webp",
-    "生气": "emotions/angry.webp",
-    "皱眉": "emotions/frown.webp",
-    "惊讶": "emotions/surprised.webp",
-    "忍耐": "emotions/endure.webp",
+    "happy": "whale_girl_moe.webp",
+    "angry": "emotions/angry.webp",
+    "surprised": "emotions/surprised.webp",
+    "calm": "whale_girl_moe.webp",
+    "sad": "emotions/teary.webp",
+    "shy": "emotions/blank.webp",
+    "tired": "emotions/frown.webp",
+    "worried": "emotions/blank.webp",
+    "moved": "emotions/blank.webp",
+    "confused": "emotions/frown.webp",
+    "indifferent": "emotions/frown.webp",
+    "scared": "emotions/endure.webp",
 }
 
 DEFAULTS: dict = {
@@ -162,12 +171,19 @@ class PluginConfig:
 
     def emotion_map(self) -> dict[str, str]:
         raw = self.get("emotion_map", DEFAULT_EMOTION_MAP)
-        if not isinstance(raw, dict):
-            raw = DEFAULT_EMOTION_MAP
-        out: dict[str, str] = {}
-        for key, value in raw.items():
-            if isinstance(key, str) and isinstance(value, str) and value.strip():
-                out[key.strip()] = value.strip()
+        out = dict(DEFAULT_EMOTION_MAP)
+        if isinstance(raw, dict):
+            # Built-in sprites are keyed by visual group.  Legacy Chinese keys
+            # ("笑"/"忍耐"...) are ignored so the new built-in mapping takes
+            # effect for existing configs; custom characters use characters.json.
+            for key, value in raw.items():
+                if (
+                    isinstance(key, str)
+                    and key in EMOTION_IDS
+                    and isinstance(value, str)
+                    and value.strip()
+                ):
+                    out[key] = value.strip()
         return out
 
     def asset(self, relative: str) -> Path | None:

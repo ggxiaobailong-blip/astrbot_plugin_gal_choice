@@ -39,11 +39,19 @@
       linear-gradient(180deg, rgba(4,10,20,.10) 0%, rgba(4,10,20,0) 35%, rgba(4,10,20,.26) 100%);
   }
 
-  .char {
+  .char-box {
     position: absolute;
-    width: auto;
     transform: translateX(-50%);
     z-index: 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .char-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center bottom;
     filter: drop-shadow(0 10px 34px rgba(0,0,0,.5));
   }
 
@@ -249,7 +257,7 @@
 
   <div class="scene-tag"><i></i>GAL MODE</div>
 
-  {% if char_url %}<img class="char" src="{{ char_url }}" style="left:{{ char_left }}%; top:{{ char_top }}px; height:{{ char_height }}px; max-width:{{ char_max_width }}%;" alt=""/>{% endif %}
+  {% if char_url %}<div class="char-box" style="left:{{ char_left }}%; top:{{ char_top }}px; width:{{ char_max_width }}%; height:{{ char_height }}px;"><img src="{{ char_url }}" alt=""/></div>{% endif %}
 
   <div class="opt-header">选择你的回应</div>
   {% for option in options %}

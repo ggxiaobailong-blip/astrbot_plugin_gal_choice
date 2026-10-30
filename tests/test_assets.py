@@ -80,6 +80,18 @@ class AssetStoreTest(unittest.TestCase):
             self.store.resolve_sprite(restored, "笑"),
         )
 
+    def test_builtin_emotion_mapping(self):
+        profile = self.store.builtin_profile()
+        self.assertIn("teary.webp", self.store.resolve_sprite(profile, "sad").name)
+        self.assertIn("blank.webp", self.store.resolve_sprite(profile, "shy").name)
+        self.assertIn("frown.webp", self.store.resolve_sprite(profile, "tired").name)
+        self.assertIn("blank.webp", self.store.resolve_sprite(profile, "worried").name)
+        self.assertIn("blank.webp", self.store.resolve_sprite(profile, "moved").name)
+        self.assertIn("whale_girl_moe.webp", self.store.resolve_sprite(profile, "calm").name)
+        self.assertIn("frown.webp", self.store.resolve_sprite(profile, "confused").name)
+        self.assertIn("frown.webp", self.store.resolve_sprite(profile, "indifferent").name)
+        self.assertIn("endure.webp", self.store.resolve_sprite(profile, "scared").name)
+
     def test_builtin_cannot_upload_or_delete(self):
         import asyncio
 

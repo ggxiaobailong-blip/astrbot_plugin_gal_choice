@@ -36,6 +36,8 @@ class RendererTest(unittest.TestCase):
     def test_build_shape(self):
         template, data = self.build()
         self.assertIn("{{ say|e }}", template)
+        self.assertIn("object-fit: contain", template)
+        self.assertIn("char-box", template)
         self.assertEqual(data["speaker"], "阿岚")
         self.assertEqual(len(data["options"]), 4)
         self.assertEqual(data["options"][-1]["letter"], "0")

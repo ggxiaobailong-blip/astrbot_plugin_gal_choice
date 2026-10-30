@@ -43,13 +43,30 @@
           <div class="preview-card">
             <div class="preview-head">
               <span class="badge" id="activeBadge">内置角色</span>
-              <button class="btn small ghost" id="previewBtn" type="button">刷新预览</button>
+              <button class="btn small ghost" id="previewBtn" type="button">生成最终图</button>
             </div>
             <div class="preview-stage" id="previewStage">
-              <div class="preview-empty" id="previewEmpty">正在生成预览…</div>
-              <img id="previewImage" alt="预览" hidden />
+              <div class="draft-stage" id="draftStage">
+                <img class="draft-bg" id="draftBg" alt="" />
+                <div class="draft-char-box" id="draftCharBox"><img id="draftChar" alt="" /></div>
+                <div class="draft-options" id="draftOptions">
+                  <div class="draft-opt-head">选择你的回应</div>
+                  <div class="draft-opt">A&nbsp; 先从作息调整开始</div>
+                  <div class="draft-opt">B&nbsp; 试试睡前放松练习</div>
+                  <div class="draft-opt">C&nbsp; 聊聊压力和心事</div>
+                  <div class="draft-opt draft-free">0&nbsp; 没有想要的选项吗，直接输入你的回答</div>
+                </div>
+                <div class="draft-dialog">
+                  <div class="draft-quote" id="draftQuote"></div>
+                  <div class="draft-speaker" id="draftSpeaker">鲸鱼娘</div>
+                  <div class="draft-say" id="draftSay"></div>
+                </div>
+                <span class="draft-tag">本地草稿 · 实时</span>
+              </div>
+              <img id="previewImage" alt="最终成图" hidden />
+              <div class="preview-empty" id="previewEmpty" hidden></div>
             </div>
-            <p class="tip" id="previewTip">预览会使用当前角色、背景和位置参数。</p>
+            <p class="tip" id="previewTip">上方是本地草稿，拖动滑块即时更新，不消耗 T2I；点「生成最终图」才渲染 1280×720 成图。</p>
           </div>
 
           <div class="controls">
@@ -82,11 +99,11 @@
                 <input type="range" id="top" min="-400" max="900" step="1" value="22" />
               </label>
               <label class="slider">
-                <span>立绘高度 <b id="heightVal">907px</b></span>
+                <span>立绘高度上限 <b id="heightVal">907px</b></span>
                 <input type="range" id="height" min="160" max="2200" step="10" value="907" />
               </label>
               <label class="slider">
-                <span>最大宽度 <b id="widthVal">62%</b></span>
+                <span>立绘宽度上限 <b id="widthVal">62%</b></span>
                 <input type="range" id="maxWidth" min="10" max="100" step="1" value="62" />
               </label>
             </div>
@@ -94,7 +111,7 @@
               <button class="btn primary" id="saveLayoutBtn" type="button">保存位置</button>
               <button class="btn ghost danger" id="deleteCharBtn" type="button" hidden>删除当前角色</button>
             </div>
-            <p class="tip">立绘按高度缩放，宽度自适应；不同尺寸的图片用这两个滑块调到人物不被对话框挡住、也不超出画面。</p>
+            <p class="tip">立绘按原图比例缩放，不会被拉伸；高度/宽度是最大边界。不同尺寸的图片调到人物不被对话框挡住、也不超出画面即可。</p>
           </div>
         </div>
 

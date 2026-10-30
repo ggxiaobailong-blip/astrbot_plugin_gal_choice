@@ -6,8 +6,6 @@ let state = null;
 let activeId = null;
 let previewTimer = null;
 let previewBusy = false;
-let previewPending = false;
-let lastPreviewKey = "";
 let deleteArmed = false;
 let deleteTimer = null;
 
@@ -246,10 +244,8 @@ function bindLayoutLabels() {
     const input = $(`#${id}`);
     input.addEventListener("input", () => {
       $(`#${labelId}`).textContent = `${input.value}${suffix}`;
+      renderDraft();
     });
-    // Preview only when the slider is released: rendering is a remote T2I
-    // round-trip, so firing on every pointer move queues several stale images.
-    input.addEventListener("change", () => queuePreview(0));
   };
   bind("left", "leftVal", "%");
   bind("top", "topVal", "px");
@@ -304,51 +300,50 @@ function renderSettings() {
   $("#backgroundMode").value = state.background_mode || "session";
 }
 
-function queuePreview(delay = 650) {
+function queuePreview(delay = 0) {
   clearTimeout(previewTimer);
-  previewTimer = setTimeout(() => { renderPreview(); }, delay);
+  previewTimer = setTimeout(() => { renderDraft(); }, delay);
 }
 
-function previewKey(profile) {
-  const files = {};
-  Object.entries(profile?.sprites || {}).forEach(([key, value]) => {
-    files[key] = value?.file || "";
-  });
-  return JSON.stringify({
-    profile: profile?.id,
-    sprites: files,
-    default: profile?.default?.file,
-    layout: readLayout(),
-    quote: $("#previewQuote").value,
-    say: $("#previewSay").value,
-    emotion: $("#previewEmotion").value,
-    background: state?.active_background,
-    mode: state?.background_mode,
-  });
+function showDraft() {
+  $("#draftStage").hidden = false;
+  $("#previewImage").hidden = true;
+  $("#previewEmpty").hidden = true;
 }
 
-async function renderPreview(force = false) {
+function renderDraft() {
   const profile = activeProfile();
-  if (!profile) return;
-  const key = previewKey(profile);
-  if (!force && key === lastPreviewKey && $("#previewImage").src) {
-    return;
-  }
-  if (previewBusy) {
-    previewPending = true;
-    return;
-  }
+  if (!profile || !state) return;
+  const layout = readLayout();
+  const emotion = $("#previewEmotion").value;
+  const char = profile.sprites?.[emotion]?.url || profile.default?.url || "";
+  const backgrounds = state.backgrounds || [];
+  const bg = backgrounds.find((item) => item.name === state.active_background) || backgrounds[0];
+  const bgImg = $("#draftBg");
+  const charImg = $("#draftChar");
+  const box = $("#draftCharBox");
+  if (bgImg.getAttribute("src") !== (bg?.url || "")) bgImg.src = bg?.url || "";
+  bgImg.hidden = !bg?.url;
+  charImg.src = char;
+  box.hidden = !char;
+  box.style.left = `${layout.left}%`;
+  box.style.top = `${(layout.top / 720) * 100}%`;
+  box.style.width = `${layout.max_width}%`;
+  box.style.height = `${(layout.height / 720) * 100}%`;
+  $("#draftQuote").textContent = $("#previewQuote").value || "（玩家原话）";
+  $("#draftSay").textContent = $("#previewSay").value || "（角色台词）";
+  $("#draftSpeaker").textContent = (state.settings || {}).bot_label || "鲸鱼娘";
+  showDraft();
+}
+
+async function renderPreview() {
+  const profile = activeProfile();
+  if (!profile || previewBusy) return;
   previewBusy = true;
-  previewPending = false;
   const empty = $("#previewEmpty");
   const image = $("#previewImage");
-  const hadImage = Boolean(image.src) && !image.hidden;
   empty.hidden = false;
-  empty.textContent = hadImage
-    ? "正在更新预览…"
-    : "正在生成预览…（通常 5~10 秒）";
-  empty.classList.toggle("overlay", hadImage);
-  if (!hadImage) image.hidden = true;
+  empty.textContent = "正在生成最终图…（通常 5~10 秒）";
   try {
     const result = await apiPost("preview", {
       quote: $("#previewQuote").value,
@@ -358,26 +353,17 @@ async function renderPreview(force = false) {
       options: ["先从作息调整开始", "试试睡前放松练习", "聊聊压力和心事", "要不要看医生"],
     });
     if (!result?.url) throw new Error("预览没有返回图片");
-    image.onload = () => { empty.hidden = true; empty.classList.remove("overlay"); };
-    image.onerror = () => { empty.hidden = false; empty.textContent = "预览图加载失败"; empty.classList.remove("overlay"); image.hidden = true; };
+    image.onload = () => { empty.hidden = true; };
+    image.onerror = () => { empty.hidden = false; empty.textContent = "最终图加载失败"; image.hidden = true; };
     image.src = result.url;
     image.hidden = false;
+    $("#draftStage").hidden = true;
     empty.hidden = true;
-    empty.classList.remove("overlay");
-    lastPreviewKey = key;
   } catch (error) {
-    lastPreviewKey = "";
-    empty.hidden = false;
-    empty.textContent = hadImage ? "预览更新失败，显示上一次结果" : (error?.message || "预览失败");
-    empty.classList.toggle("overlay", hadImage);
-    if (!hadImage) image.hidden = true;
-    toast(error?.message || "预览失败", true);
+    empty.hidden = true;
+    toast(error?.message || "最终图生成失败", true);
   } finally {
     previewBusy = false;
-    if (previewPending) {
-      previewPending = false;
-      queuePreview(80);
-    }
   }
 }
 
@@ -511,7 +497,7 @@ function bindTabs() {
 
 function bindEvents() {
   $("#refreshBtn").addEventListener("click", loadState);
-  $("#previewBtn").addEventListener("click", () => renderPreview(true));
+  $("#previewBtn").addEventListener("click", () => renderPreview());
   $("#saveLayoutBtn").addEventListener("click", saveLayout);
   $("#deleteCharBtn").addEventListener("click", deleteCharacter);
   $("#renameCharBtn").addEventListener("click", renameCharacter);
