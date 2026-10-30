@@ -133,6 +133,12 @@ button { cursor: pointer; }
 }
 .preview-stage img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .preview-empty { color: var(--muted); font-size: 13px; }
+.preview-empty.overlay {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  color: #fff; background: rgba(20, 30, 46, .78); border: 1px solid rgba(255,255,255,.15);
+  padding: 5px 12px; border-radius: 999px; font-size: 11.5px; white-space: nowrap;
+  backdrop-filter: blur(4px);
+}
 
 .controls { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .field { display: flex; flex-direction: column; gap: 6px; }

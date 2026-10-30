@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2 - 2026-10-30
+
+- 修复 WebUI 上传时 `Plugin bridge endpoint is invalid`：bridge 不允许 endpoint 带查询参数，上传改为路径参数 `/upload/sprite/<角色>/<情绪>` 和 `/upload/background`。
+- 优化预览速度：位置滑块只在松开时触发一次渲染，增加相同参数缓存；生成新图时保留上一张预览并显示“正在更新”。
+- 新增 `character_id` / `emotion` 路径路由，旧 `/upload?...` 接口保留兼容。
+
 ## 0.3.1 - 2026-10-30
 
 - 修复 WebUI 在 AstrBot 沙箱 iframe 中 `window.prompt` / `window.confirm` 被禁用，导致「新建角色」无反应：改为侧栏内联输入，删除改为二次确认。

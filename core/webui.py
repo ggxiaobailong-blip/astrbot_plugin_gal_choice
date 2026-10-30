@@ -59,7 +59,19 @@ class GalWebUI:
             ("/character/save", self.save_character, ["POST"], "保存角色布局/名称"),
             ("/character/activate", self.activate_character, ["POST"], "切换角色"),
             ("/character/delete", self.delete_character, ["POST"], "删除角色"),
-            ("/upload", self.upload_asset, ["POST"], "上传立绘/背景"),
+            ("/upload", self.upload_asset, ["POST"], "上传立绘/背景（兼容旧接口）"),
+            (
+                "/upload/background",
+                self.upload_background,
+                ["POST"],
+                "上传背景",
+            ),
+            (
+                "/upload/sprite/<character_id>/<emotion>",
+                self.upload_sprite,
+                ["POST"],
+                "上传角色立绘",
+            ),
             ("/sprite/bind", self.bind_sprite, ["POST"], "多个情绪共用一张立绘"),
             ("/background/select", self.select_background, ["POST"], "选择背景"),
             ("/settings/save", self.save_settings, ["POST"], "保存外观设置"),
@@ -127,6 +139,39 @@ class GalWebUI:
         except Exception as exc:
             return error_response(str(exc), status_code=400)
         return json_response({"ok": True, **self._state()})
+
+    async def upload_background(self):
+        files = await request.files()
+        upload = files.get("file")
+        if upload is None:
+            return error_response("缺少上传文件", status_code=400)
+        try:
+            name = await self.assets.save_background(upload)
+            return json_response({"ok": True, "background": name, **self._state()})
+        except Exception as exc:
+            return error_response(str(exc), status_code=400)
+
+    async def upload_sprite(self, character_id: str, emotion: str):
+        files = await request.files()
+        upload = files.get("file")
+        if upload is None:
+            return error_response("缺少上传文件", status_code=400)
+        try:
+            profile = await self.assets.save_sprite(
+                str(character_id or "").strip(),
+                str(emotion or "default").strip(),
+                upload,
+            )
+            return json_response(
+                {
+                    "ok": True,
+                    "profile": profile.id,
+                    "emotion": emotion,
+                    **self._state(),
+                }
+            )
+        except Exception as exc:
+            return error_response(str(exc), status_code=400)
 
     async def upload_asset(self):
         files = await request.files()

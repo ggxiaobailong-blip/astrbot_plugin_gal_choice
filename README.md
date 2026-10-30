@@ -43,7 +43,7 @@
 
 ```bash
 cd AstrBot/data/plugins
-git clone https://github.com/<your-name>/astrbot_plugin_gal_choice.git
+git clone https://github.com/ggxiaobailong-blip/astrbot_plugin_gal_choice.git
 pip install -r astrbot_plugin_gal_choice/requirements.txt
 ```
 
