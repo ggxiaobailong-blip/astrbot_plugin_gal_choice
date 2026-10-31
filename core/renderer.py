@@ -12,12 +12,7 @@ from .assets import AssetStore, normalize_layout
 from .config import TEMPLATE_DIR, PluginConfig
 from .parser import LETTERS, display_units, fit_text
 
-try:
-    from astrbot.api import logger
-except Exception:  # pragma: no cover - local unit tests without AstrBot
-    import logging
-
-    logger = logging.getLogger("astrbot.plugin.gal_choice.renderer")
+from astrbot.api import logger
 
 W, H = 1280, 720
 BOX_TOP = int(H * 0.69)

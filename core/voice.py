@@ -19,12 +19,7 @@ from astrbot.api.message_components import Record
 from .config import PluginConfig, plugin_data_dir
 from .emotions import tag_marker
 
-try:
-    from astrbot.api import logger
-except Exception:  # pragma: no cover - local unit tests without AstrBot
-    import logging
-
-    logger = logging.getLogger("astrbot.plugin.gal_choice.voice")
+from astrbot.api import logger
 
 try:
     import pysilk

@@ -33,12 +33,7 @@ from .emotions import (
     known_emotion,
 )
 
-try:
-    from astrbot.api import logger
-except Exception:  # pragma: no cover
-    import logging
-
-    logger = logging.getLogger("astrbot.plugin.gal_choice.assets")
+from astrbot.api import logger
 
 PLUGIN_NAME = "astrbot_plugin_gal_choice"
 EMOTIONS = EMOTION_IDS

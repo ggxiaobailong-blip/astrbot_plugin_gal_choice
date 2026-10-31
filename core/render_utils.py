@@ -19,12 +19,7 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     render_browser = None
 
-try:
-    from astrbot.api import logger
-except Exception:  # pragma: no cover
-    import logging
-
-    logger = logging.getLogger("astrbot.plugin.gal_choice.render")
+from astrbot.api import logger
 
 # Avoid hammering an endpoint that just returned 502/503.
 _BAD_UNTIL: dict[str, float] = {}

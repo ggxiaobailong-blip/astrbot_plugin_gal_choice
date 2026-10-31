@@ -10,12 +10,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-try:
-    from astrbot.api import logger
-except Exception:  # pragma: no cover - local unit tests without AstrBot
-    import logging
-
-    logger = logging.getLogger("astrbot.plugin.gal_choice.state")
+from astrbot.api import logger
 
 
 @dataclass

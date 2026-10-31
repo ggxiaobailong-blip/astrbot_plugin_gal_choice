@@ -20,12 +20,7 @@ except Exception:  # pragma: no cover - older AstrBot without plugin pages
     error_response = json_response = request = None  # type: ignore
     WEB_API_AVAILABLE = False
 
-try:
-    from astrbot.api import logger
-except Exception:  # pragma: no cover
-    import logging
-
-    logger = logging.getLogger("astrbot.plugin.gal_choice.webui")
+from astrbot.api import logger
 
 PLUGIN_NAME = "astrbot_plugin_gal_choice"
 
