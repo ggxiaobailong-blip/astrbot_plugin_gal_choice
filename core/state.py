@@ -28,6 +28,14 @@ class Session:
     prev_provider_id: str = ""
     voice_enabled: bool | None = None
     options_at: float = 0.0
+    affection: int = 50
+    mood: str = "calm"
+    affection_delta: int = 0
+    script: dict = field(default_factory=dict)
+    option_meta: list[dict] = field(default_factory=list)
+    ending_id: str = ""
+    ending_title: str = ""
+    ended: bool = False
     updated_at: float = field(default_factory=time.time)
 
     def touch(self) -> None:
@@ -55,6 +63,14 @@ class Session:
             "prev_provider_id": self.prev_provider_id,
             "voice_enabled": self.voice_enabled,
             "options_at": self.options_at,
+            "affection": self.affection,
+            "mood": self.mood,
+            "affection_delta": self.affection_delta,
+            "script": self.script,
+            "option_meta": self.option_meta,
+            "ending_id": self.ending_id,
+            "ending_title": self.ending_title,
+            "ended": self.ended,
             "updated_at": self.updated_at,
         }
 
@@ -77,6 +93,18 @@ class Session:
             prev_provider_id=str(data.get("prev_provider_id") or ""),
             voice_enabled=voice if isinstance(voice, bool) else None,
             options_at=float(data.get("options_at") or data.get("updated_at") or 0),
+            affection=max(0, min(100, int(data["affection"] if data.get("affection") is not None else 50))),
+            mood=str(data.get("mood") or "calm"),
+            affection_delta=int(data.get("affection_delta") or 0),
+            script=dict(data.get("script") or {}) if isinstance(data.get("script"), dict) else {},
+            option_meta=[
+                dict(item)
+                for item in (data.get("option_meta") or [])
+                if isinstance(item, dict)
+            ][:4],
+            ending_id=str(data.get("ending_id") or ""),
+            ending_title=str(data.get("ending_title") or ""),
+            ended=bool(data.get("ended")),
             updated_at=float(data.get("updated_at") or time.time()),
         )
 
@@ -120,6 +148,8 @@ class SessionStore:
     def _is_expired(self, session: Session, now: float) -> bool:
         if session.mode == "gal":
             limit = self.idle_seconds
+        elif session.mode == "ended":
+            limit = max(self.idle_seconds, 24 * 3600)
         elif session.options:
             limit = self.option_ttl
         else:
@@ -159,6 +189,9 @@ class SessionStore:
 
     def remove(self, key: str) -> None:
         self._sessions.pop(key, None)
+
+    def put(self, session: Session) -> None:
+        self._sessions[session.key] = session
 
     # ---------- write ----------
 

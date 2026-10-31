@@ -66,6 +66,32 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(turn.options, ["解释迟到", "认真道歉"])
         self.assertTrue(turn.say)
 
+    def test_affection_delta(self):
+        turn = parse_gal_reply(
+            "<line><emo>开心</emo><say>你比我更甜。</say></line>"
+            "<opt>继续</opt><opt>走开</opt>"
+            "<affection>+3</affection>"
+        )
+        self.assertEqual(turn.affection_delta, 3)
+        self.assertNotIn("<affection>", turn.say)
+        neutral = parse_gal_reply(
+            "<line><emo>平静</emo><say>谢谢。</say></line>"
+            "<opt>继续</opt><opt>走开</opt>"
+        )
+        self.assertIsNone(neutral.affection_delta)
+
+    def test_branch_meta_and_ending(self):
+        turn = parse_gal_reply(
+            "<line><emo>平静</emo><say>到此为止吧。</say></line>"
+            '<opt branch="heart" impact="major">靠近她</opt>'
+            '<opt branch="reason" impact="major">保持距离</opt>'
+            "<ending>true</ending>"
+        )
+        self.assertEqual(turn.option_meta[0]["branch"], "heart")
+        self.assertEqual(turn.option_meta[1]["impact"], "major")
+        self.assertEqual(turn.ending, "true")
+        self.assertEqual(turn.options, ["靠近她", "保持距离"])
+
     def test_no_options_returns_text(self):
         turn = parse_gal_reply("今天天气不错。")
         self.assertEqual(turn.options, [])

@@ -20,6 +20,7 @@ from astrbot.api.star import Context, Star
 if __package__:
     from .core.assets import AssetStore
     from .core.config import PluginConfig, plugin_data_dir
+    from .core.affection import clamp, mood_for, stage_for, tone_hint
     from .core.parser import (
         LETTERS,
         GalLine,
@@ -45,11 +46,14 @@ if __package__:
     )
     from .core.renderer import Renderer
     from .core.render_utils import render_image
+    from .core.saves import SaveStore
+    from .core.script import brief as script_brief, ending_by_id, fallback_outline, outline_prompt, parse_outline
     from .core.state import Session, SessionStore
     from .core.voice import VoiceService
     from .core.webui import GalWebUI
 else:  # pragma: no cover - only used when running the file directly
     from core.assets import AssetStore
+    from core.affection import clamp, mood_for, stage_for, tone_hint
     from core.config import PluginConfig, plugin_data_dir
     from core.parser import (
         LETTERS,
@@ -76,6 +80,8 @@ else:  # pragma: no cover - only used when running the file directly
     )
     from core.renderer import Renderer
     from core.render_utils import render_image
+    from core.saves import SaveStore
+    from core.script import brief as script_brief, ending_by_id, fallback_outline, outline_prompt, parse_outline
     from core.state import Session, SessionStore
     from core.voice import VoiceService
     from core.webui import GalWebUI
@@ -102,6 +108,7 @@ class GalChoicePlugin(Star):
             idle_seconds=self.config.int("mode_idle_minutes", 120, 5, 7 * 24 * 60) * 60,
             option_ttl=self.config.int("option_ttl", 600, 30, 86400),
         )
+        self.saves = SaveStore(10)
         self.assets = AssetStore(self.config)
         self.renderer = Renderer(self.config, self.assets)
         self.voice = VoiceService(context, self.config)
@@ -125,6 +132,16 @@ class GalChoicePlugin(Star):
         except Exception:
             uid = ""
         return f"{umo}|{uid}" if umo else str(uid or "unknown")
+
+    @staticmethod
+    def _is_private(event: AstrMessageEvent) -> bool:
+        checker = getattr(event, "is_private_chat", None)
+        if not callable(checker):
+            return True
+        try:
+            return bool(checker())
+        except Exception:
+            return True
 
     def _lock_for(self, key: str) -> asyncio.Lock:
         lock = self._locks.get(key)
@@ -216,25 +233,71 @@ class GalChoicePlugin(Star):
 
     # ---------- 模式 ----------
 
-    async def _enter(self, event: AstrMessageEvent, session: Session) -> None:
+    async def _generate_outline(self, event: AstrMessageEvent, session: Session, setting: str = "") -> None:
+        setting = (setting or "").strip()
+        try:
+            provider = self.context.get_using_provider(event.unified_msg_origin)
+        except Exception:
+            provider = None
+        if provider is None or not hasattr(provider, "text_chat"):
+            session.script = fallback_outline(setting)
+            return
+        try:
+            response = await asyncio.wait_for(
+                provider.text_chat(
+                    prompt=outline_prompt(setting),
+                    system_prompt="你是 GalGame 编剧。只输出合法 JSON，不要 Markdown。",
+                ),
+                timeout=45,
+            )
+            text = getattr(response, "completion_text", "") or ""
+            session.script = parse_outline(text, setting)
+            logger.info(
+                "[gal] 生成剧本大纲 title=%s acts=%s",
+                session.script.get("title"),
+                session.script.get("acts"),
+            )
+        except Exception as exc:
+            logger.warning("[gal] 生成剧本大纲失败，使用默认大纲: %s", exc)
+            session.script = fallback_outline(setting)
+
+    def _entry_setting(self, text: str) -> str:
+        raw = (text or "").strip()
+        candidates = sorted(self._entry_words(), key=len, reverse=True)
+        for word in candidates:
+            if word and raw.casefold().startswith(word.casefold()):
+                return raw[len(word):].strip(" \t\r\n，,。.!！：:；;")
+        return ""
+
+    async def _enter(self, event: AstrMessageEvent, session: Session, setting: str = "") -> None:
         session.mode = "gal"
         session.just_entered = True
         session.options = []
+        session.option_meta = []
         session.quote = ""
         session.emotion = ""
         session.turn_id = 0
         session.history = []
         session.bg = ""
         session.options_at = 0.0
+        session.affection = 50
+        session.mood = "calm"
+        session.affection_delta = 0
+        session.script = {}
+        session.ending_id = ""
+        session.ending_title = ""
+        session.ended = False
         session.touch()
         target = session.provider_id or self.config.str("gal_provider_id")
         if target:
             await self._switch_provider(event, session, target)
+        await self._generate_outline(event, session, setting)
 
     async def _exit(self, event: AstrMessageEvent, session: Session) -> None:
         await self._restore_provider(event, session)
         session.mode = "chat"
         session.options = []
+        session.option_meta = []
         session.quote = ""
         session.emotion = ""
         session.turn_id = 0
@@ -242,6 +305,10 @@ class GalChoicePlugin(Star):
         session.history = []
         session.bg = ""
         session.options_at = 0.0
+        session.script = {}
+        session.ending_id = ""
+        session.ending_title = ""
+        session.ended = False
         session.touch()
 
     # ---------- 指令 ----------
@@ -250,9 +317,18 @@ class GalChoicePlugin(Star):
     async def gal(self, event: AstrMessageEvent, action: str = "", value: str = ""):
         """GalGame 模式控制：/gal [start|stop|status|model|voice|reset|help]。"""
         key = self._key(event)
+        if not self._is_private(event):
+            yield event.plain_result("GalGame 模式只在私聊开放。")
+            return
         session = self.store.get_or_create(key)
         action = (action or "").strip().lower()
         value = (value or "").strip()
+
+        if action in {"new", "新周目", "重开"}:
+            await self._enter(event, session, value)
+            event.set_extra("gal_quote", "新周目")
+            await self.store.save()
+            return
 
         if not action or action in {"start", "begin", "开始", "进入"}:
             if session.mode == "gal":
@@ -263,7 +339,7 @@ class GalChoicePlugin(Star):
                     return
                 yield event.plain_result("已经在 GalGame 模式里了。选一个选项，或发送 /gal reset 重开。")
                 return
-            await self._enter(event, session)
+            await self._enter(event, session, value)
             event.set_extra("gal_quote", "开始")
             await self.store.save()
             # 不 yield：让默认 LLM 链路接手，由 inject_choice 生成开场白和选项。
@@ -279,13 +355,18 @@ class GalChoicePlugin(Star):
             return
 
         if action in {"status", "状态"}:
-            if session.mode != "gal":
+            if session.mode not in {"gal", "ended"}:
                 yield event.plain_result("当前是普通聊天模式。发送 /gal start 进入 GalGame 模式。")
                 return
             lines = [
-                "模式：GalGame",
+                f"模式：{'GalGame · 已完结' if session.ended else 'GalGame'}",
                 f"进度：{('第 ' + str(session.turn_id) + ' 幕') if session.turn_id else '序章'}",
+                f"好感：{session.affection} · {stage_for(session.affection)['label']}",
             ]
+            if session.script:
+                lines.append(f"剧本：{session.script.get('title', '')}（预计 {session.script.get('acts', 6)} 幕）")
+            if session.ending_title:
+                lines.append(f"结局：{session.ending_title}")
             if session.options:
                 lines.append("当前选项：")
                 for index, option in enumerate(session.options):
@@ -303,6 +384,72 @@ class GalChoicePlugin(Star):
             )
             lines.append(f"语音：{'开' if voice_on else '关'}")
             yield event.plain_result("\n".join(lines))
+            return
+
+        if action in {"save", "存档"}:
+            if session.mode != "gal":
+                yield event.plain_result("当前不在 GalGame 模式，无法存档。")
+                return
+            name = value or f"存档 {len(self.saves.list(key)) + 1}"
+            saved = await self.saves.save(key, name, session)
+            yield event.plain_result(
+                f"已存档「{saved}」：第 {session.turn_id or 0} 幕，好感 {session.affection}。"
+            )
+            return
+
+        if action in {"load", "读档"}:
+            slots = self.saves.list(key)
+            if not slots:
+                yield event.plain_result("还没有存档。用 /gal save 名字 保存当前进度。")
+                return
+            if not value:
+                yield event.plain_result(
+                    "当前存档：\n"
+                    + "\n".join(
+                        f"  {item['name']}（第 {item['turn']} 幕，好感 {item['affection']}）"
+                        for item in slots
+                    )
+                    + "\n用 /gal load 存档名 读取。"
+                )
+                return
+            payload = await self.saves.load(key, value)
+            if payload is None:
+                yield event.plain_result(f"找不到存档「{value}」。用 /gal load 查看列表。")
+                return
+            loaded = Session.from_dict(key, payload)
+            self.store.put(loaded)
+            if loaded.mode == "gal":
+                target = loaded.provider_id or self.config.str("gal_provider_id")
+                if target:
+                    await self._switch_provider(event, loaded, target)
+            await self.store.save()
+            yield event.plain_result(
+                f"已读取「{value}」：第 {loaded.turn_id or 0} 幕，好感 {loaded.affection}。"
+            )
+            return
+
+        if action in {"saves", "存档列表"}:
+            slots = self.saves.list(key)
+            if not slots:
+                yield event.plain_result("还没有存档。用 /gal save 名字 保存当前进度。")
+                return
+            yield event.plain_result(
+                "存档列表：\n"
+                + "\n".join(
+                    f"  {item['name']}（第 {item['turn']} 幕，好感 {item['affection']}）"
+                    for item in slots
+                )
+            )
+            return
+
+        if action in {"delete", "删除存档"}:
+            if not value:
+                yield event.plain_result("用法：/gal delete 存档名")
+                return
+            removed = await self.saves.delete(key, value)
+            yield event.plain_result(
+                f"已删除存档「{value}」。" if removed else f"找不到存档「{value}」。"
+            )
             return
 
         if action in {"model", "模型"}:
@@ -367,11 +514,16 @@ class GalChoicePlugin(Star):
         yield event.plain_result(
             "GalGame 模式指令：\n"
             "/gal               进入模式（也可以直接说“gal”）\n"
-            "/gal start         进入模式\n"
+            "/gal start [题材]   进入模式；可指定“校园恋爱”等题材\n"
+            "/gal new [题材]     结束当前局，开启新周目\n"
             "/gal stop          退出模式\n"
             "/gal status        查看当前状态\n"
             "/gal model <id>    指定模型；default 恢复跟随会话\n"
             "/gal voice on|off  开关台词语音\n"
+            "/gal save 名字     存档（最多 10 个）\n"
+            "/gal load 名字     读档；不带名字查看列表\n"
+            "/gal saves         查看存档列表\n"
+            "/gal delete 名字   删除存档\n"
             "/gal reset         清空本会话状态\n"
             "/gal help          查看帮助\n\n"
             "进入后回复 A/B/C/D 或 1/2/3/4 选择，回复 0 或直接说话则自由输入。"
@@ -383,6 +535,8 @@ class GalChoicePlugin(Star):
     async def gal_gate(self, event: AstrMessageEvent):
         """在 gal 会话里放行裸字母，并让群聊里的裸字母能够触发 LLM。"""
         try:
+            if not self._is_private(event):
+                return
             key = self._key(event)
             session = self.store.get(key)
             text = self._trigger_text(event)
@@ -404,7 +558,7 @@ class GalChoicePlugin(Star):
 
             if is_start_intent(text, self._entry_words()):
                 session = self.store.get_or_create(key)
-                await self._enter(event, session)
+                await self._enter(event, session, self._entry_setting(text))
                 await self.store.save()
                 event.is_wake = True
                 event.is_at_or_wake_command = True
@@ -541,6 +695,9 @@ class GalChoicePlugin(Star):
                     + " / ".join(followups)
                     + "。把这些和主消息看成同一轮，先回应补充内容，再给新选项。"
                 )
+            if session.script:
+                hints.append(script_brief(session.script, session.turn_id))
+            hints.append(tone_hint(session.affection))
             hints.append(
                 f"你就是「{self._bot_label()}」本人，用这个身份直接对玩家说话；"
                 "所有 <say> 必须是你开口说出的台词，禁止旁白、小说叙述、动作/环境描写；"
@@ -620,13 +777,28 @@ class GalChoicePlugin(Star):
                 text,
                 option_max_units=self.config.float("option_max_units", 16.0, 4, 30),
             )
-            if len(parsed.options) < 2:
+            ending_info = None
+            script = session.script if isinstance(session.script, dict) else {}
+            if parsed.ending:
+                ending_info = ending_by_id(script, parsed.ending)
+            if len(parsed.options) < 2 and not ending_info:
                 result.chain = [Plain(self._fallback_text(parsed.say, parsed.options))]
                 logger.warning("[gal] 本轮选项不足 2 个，降级为文字")
                 return
 
             async with self._lock_for(key):
                 session.turn_id += 1
+                old_affection = session.affection
+                old_mood = session.mood
+                old_delta = session.affection_delta
+                delta = parsed.affection_delta
+                if delta is None:
+                    session.affection_delta = 0
+                else:
+                    delta = max(-5, min(5, int(delta)))
+                    session.affection = clamp(session.affection + delta)
+                    session.affection_delta = session.affection - old_affection
+                session.mood = mood_for(parsed.emotion or session.emotion)
                 quote = (
                     event.get_extra("gal_quote")
                     or event.get_extra("_gal_merged_text")
@@ -642,6 +814,8 @@ class GalChoicePlugin(Star):
                         speaker=event.get_sender_name() or "",
                         user_id=str(event.get_sender_id() or ""),
                         lines=parsed.lines or None,
+                        option_meta=parsed.option_meta,
+                        ending=ending_info,
                     )
                     image = await render_image(
                         self,
@@ -659,12 +833,18 @@ class GalChoicePlugin(Star):
                     )
                 except Exception as exc:
                     session.turn_id = max(0, session.turn_id - 1)
+                    session.affection = old_affection
+                    session.mood = old_mood
+                    session.affection_delta = old_delta
                     logger.error("[gal] 出图失败: %s", exc, exc_info=True)
                     result.chain = [Plain(self._fallback_text(parsed.say, parsed.options))]
                     return
 
                 if not image:
                     session.turn_id = max(0, session.turn_id - 1)
+                    session.affection = old_affection
+                    session.mood = old_mood
+                    session.affection_delta = old_delta
                     result.chain = [Plain(self._fallback_text(parsed.say, parsed.options))]
                     logger.warning("[gal] 出图返回空结果，降级为文字")
                     return
@@ -677,10 +857,18 @@ class GalChoicePlugin(Star):
                     component = Image.fromFileSystem(image)
                 result.chain = [component]
                 session.options = parsed.options[:4]
+                session.option_meta = parsed.option_meta[:4]
                 session.quote = quote
                 session.emotion = parsed.emotion
                 session.just_entered = False
                 session.options_at = time.time()
+                if ending_info:
+                    session.ending_id = str(ending_info.get("id") or parsed.ending)
+                    session.ending_title = str(ending_info.get("name") or "结局")
+                    session.ended = True
+                    session.mode = "ended"
+                    session.options = []
+                    session.option_meta = []
                 session.touch()
                 await self.store.save()
 
@@ -716,7 +904,7 @@ class GalChoicePlugin(Star):
             if time.time() - created_at > 120:
                 return
             session = self.store.get(key)
-            if session is None or session.mode != "gal":
+            if session is None or session.mode not in {"gal", "ended"}:
                 return
             await self.voice.speak(event, lines, session)
         except Exception as exc:

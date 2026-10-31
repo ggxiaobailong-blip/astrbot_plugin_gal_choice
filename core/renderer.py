@@ -8,6 +8,7 @@ import io
 import random
 from pathlib import Path
 
+from .affection import mood_color, mood_label, mood_svg, stage_for
 from .assets import AssetStore, normalize_layout
 from .config import TEMPLATE_DIR, PluginConfig
 from .parser import LETTERS, display_units, fit_text
@@ -154,6 +155,8 @@ class Renderer:
         user_id: str,
         layout: dict | None = None,
         lines: list | None = None,
+        option_meta: list | None = None,
+        ending: dict | None = None,
     ) -> tuple[str, dict]:
         profile = self.assets.active()
         layout = normalize_layout(layout if layout is not None else profile.layout)
@@ -222,16 +225,41 @@ class Renderer:
 
         option_max = min(20.0, self.config.float("option_max_units", 16.0, 4, 30))
         items: list[dict] = []
+        meta_items = list(option_meta or [])
         for index, option in enumerate(options[:4]):
+            meta = meta_items[index] if index < len(meta_items) and isinstance(meta_items[index], dict) else {}
+            branch = str(meta.get("branch") or "").strip()
+            impact = str(meta.get("impact") or "").strip()
+            branch_cls = ""
+            branch_label = ""
+            if branch or impact == "major":
+                color = str(meta.get("color") or "").strip().lower()
+                if color not in {"pink", "blue", "gold"}:
+                    color = "pink" if branch in {"heart", "pink", "love"} else "blue"
+                branch_cls = f" is-branch branch-{color}"
+                if not branch:
+                    branch = "key"
+                branch_label = {
+                    "heart": "情感",
+                    "pink": "情感",
+                    "love": "情感",
+                    "reason": "理性",
+                    "blue": "理性",
+                    "key": "关键",
+                }.get(branch, "分支")
+                branch = branch[:12]
             items.append(
                 {
                     "letter": LETTERS[index],
                     "text": fit_text(option, option_max),
-                    "cls": "",
+                    "cls": branch_cls,
                     "letter_cls": "",
+                    "branch": branch,
+                    "branch_label": branch_label,
+                    "impact": impact,
                 }
             )
-        if self.config.bool("free_input_enabled", True):
+        if not ending and self.config.bool("free_input_enabled", True):
             free_hint = self.config.str("free_option_hint", "✎ 自己说点什么…")
             items.append(
                 {
@@ -239,6 +267,9 @@ class Renderer:
                     "text": fit_text(free_hint, min(24.0, max(8.0, option_max + 6))),
                     "cls": "is-free",
                     "letter_cls": "free-letter",
+                    "branch": "",
+                    "branch_label": "",
+                    "impact": "",
                 }
             )
 
@@ -253,6 +284,9 @@ class Renderer:
         if self.config.bool("show_turn_label", True):
             turn_label = f"第 {turn_id} 幕" if turn_id else "序章"
 
+        affection = int(getattr(session, "affection", 50) or 0)
+        affection_stage = stage_for(affection)
+        mood = str(getattr(session, "mood", "calm") or "calm")
         avatar = self.avatar_url(user_id)
         data = {
             "W": W,
@@ -273,6 +307,10 @@ class Renderer:
             "say_font": say_font,
             "lines": prepared,
             "options": items,
+            "option_meta": meta_items,
+            "ending": bool(ending),
+            "ending_title": str((ending or {}).get("name") or ""),
+            "ending_subtitle": str((ending or {}).get("condition") or ""),
             "opt_header_top": max(0, top_start - 28),
             "show_icons": self.config.bool("show_icons", True),
             "turn_label": turn_label,
@@ -280,5 +318,14 @@ class Renderer:
             "box_alpha": self.config.float("box_alpha", 0.94, 0.2, 1.0),
             "bg_blur": self.config.int("background_blur", 20, 0, 60),
             "has_avatar": bool(avatar),
+            "affection": affection,
+            "affection_percent": affection_stage["percent"],
+            "affection_stage": affection_stage["label"],
+            "affection_color": affection_stage["color"],
+            "affection_delta": int(getattr(session, "affection_delta", 0) or 0),
+            "mood": mood,
+            "mood_label": mood_label(mood),
+            "mood_color": mood_color(mood),
+            "mood_svg": mood_svg(mood),
         }
         return self._template, data

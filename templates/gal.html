@@ -72,6 +72,57 @@
     box-shadow: 0 0 10px #67c7ff;
   }
 
+  /* ---------- 好感度 HUD ---------- */
+  .affection-hud {
+    position: absolute; top: 24px; right: 28px; z-index: 6;
+    display: flex; align-items: center; gap: 11px;
+    min-width: 300px; padding: 10px 14px 10px 11px;
+    border-radius: 17px;
+    background: rgba(8, 18, 32, .56);
+    border: 1px solid rgba(255,255,255,.22);
+    box-shadow: 0 8px 24px rgba(0,0,0,.26);
+    backdrop-filter: blur(10px);
+  }
+  .affection-face {
+    width: 42px; height: 42px; flex: 0 0 42px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.10);
+  }
+  .affection-face svg { width: 34px; height: 34px; display: block; }
+  .affection-main { flex: 1; min-width: 0; }
+  .affection-top { display: flex; align-items: center; gap: 7px; min-height: 21px; line-height: 1; }
+  .affection-heart { width: 15px; height: 15px; flex: 0 0 15px; }
+  .affection-label {
+    font-size: 11px; font-weight: 800; letter-spacing: 1.5px;
+    color: rgba(235,245,255,.78);
+  }
+  .affection-delta {
+    font-size: 15px; font-weight: 900; line-height: 1;
+    color: #42182a; background: #f29cc4;
+    border: 1px solid rgba(255,255,255,.30);
+    border-radius: 999px; padding: 3px 8px; margin-left: auto;
+    box-shadow: 0 0 0 3px rgba(242,156,196,.16), 0 2px 8px rgba(0,0,0,.18);
+  }
+  .affection-delta.negative {
+    color: #08243d; background: #6fb6ff;
+    box-shadow: 0 0 0 3px rgba(111,182,255,.18), 0 2px 8px rgba(0,0,0,.18);
+  }
+  .affection-track {
+    height: 9px; margin-top: 7px; border-radius: 999px;
+    background: rgba(255,255,255,.18); overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.34);
+  }
+  .affection-fill {
+    display: block; height: 100%; border-radius: 999px;
+    box-shadow: 0 0 12px rgba(111,182,255,.35);
+  }
+  .affection-stage {
+    margin-top: 5px; font-size: 10px; font-weight: 800;
+    letter-spacing: 1px; color: rgba(226,239,251,.76);
+  }
+
   /* ---------- 对话框 ---------- */
   .box {
     position: absolute;
@@ -232,6 +283,62 @@
   .option.is-free:before {
     background: linear-gradient(180deg, #b9d3ec, #7fa5c9);
   }
+  .option.is-branch {
+    border-width: 2.5px;
+    padding-right: 58px;
+  }
+  .option.branch-pink {
+    border-color: #f29cc4;
+    background: linear-gradient(180deg, #fff7fb, #ffeaf4);
+    box-shadow: 0 7px 18px rgba(242,156,196,.28), 0 0 0 1px rgba(242,156,196,.18);
+  }
+  .option.branch-pink:before { background: linear-gradient(180deg,#ff9ec4,#ee6d9e); }
+  .option.branch-blue {
+    border-color: #79b7ef;
+    background: linear-gradient(180deg, #f6fbff, #e9f4ff);
+    box-shadow: 0 7px 18px rgba(121,183,239,.26), 0 0 0 1px rgba(121,183,239,.16);
+  }
+  .option.branch-blue:before { background: linear-gradient(180deg,#6fb6ff,#3d86d8); }
+  .option.branch-gold {
+    border-color: #e7c46c;
+    background: linear-gradient(180deg, #fffdf5, #fff7df);
+    box-shadow: 0 7px 18px rgba(231,196,108,.24), 0 0 0 1px rgba(231,196,108,.14);
+  }
+  .option.branch-gold:before { background: linear-gradient(180deg,#e7c46c,#c49a36); }
+  .opt-branch {
+    position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+    font-size: 9px; font-weight: 800; letter-spacing: .5px;
+    color: #a9577c; background: rgba(242,156,196,.18);
+    border: 1px solid rgba(242,156,196,.35); border-radius: 999px;
+    padding: 2px 5px; max-width: 44px; overflow: hidden;
+    white-space: nowrap; text-overflow: ellipsis;
+  }
+  .option.branch-blue .opt-branch {
+    color: #2f6ca8; background: rgba(121,183,239,.15); border-color: rgba(121,183,239,.38);
+  }
+  .option.branch-gold .opt-branch {
+    color: #8a6a1d; background: rgba(231,196,108,.16); border-color: rgba(231,196,108,.40);
+  }
+  .ending-banner {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    z-index: 7; min-width: 520px; max-width: 720px;
+    padding: 26px 42px 24px; border-radius: 24px; text-align: center;
+    background: rgba(8,18,32,.72); border: 1px solid rgba(255,255,255,.30);
+    box-shadow: 0 18px 48px rgba(0,0,0,.38), 0 0 0 1px rgba(255,255,255,.06);
+    backdrop-filter: blur(14px);
+  }
+  .ending-banner .e-kicker {
+    display: block; font-size: 12px; font-weight: 800; letter-spacing: 7px;
+    color: rgba(255,205,225,.88); margin-bottom: 8px;
+  }
+  .ending-banner .e-title {
+    display: block; font-size: 38px; line-height: 1.2; font-weight: 800; color: #fff;
+    letter-spacing: 2px; text-shadow: 0 3px 18px rgba(0,0,0,.42);
+  }
+  .ending-banner .e-sub {
+    display: block; margin-top: 10px; font-size: 11px; color: rgba(224,238,251,.70);
+    letter-spacing: .5px;
+  }
   .opt-letter {
     flex: 0 0 28px;
     font-size: 15px; font-weight: 900; color: #2b73d8;
@@ -257,15 +364,43 @@
 
   <div class="scene-tag"><i></i>GAL MODE</div>
 
+  <div class="affection-hud">
+    <div class="affection-face">{{ mood_svg|safe }}</div>
+    <div class="affection-main">
+      <div class="affection-top">
+        <svg class="affection-heart" viewBox="0 0 24 24"><path d="M12 21s-7.5-4.7-9.8-9.2C.8 8.9 2.8 5 6.6 5c2.1 0 3.6 1.2 4.4 2.5C11.8 6.2 13.3 5 15.4 5c3.8 0 5.8 3.9 4.4 6.8C19.5 16.3 12 21 12 21z" fill="#ff9dbd"/></svg>
+        <span class="affection-label">好感度</span>
+        {% if affection_delta %}
+        <span class="affection-delta{% if affection_delta < 0 %} negative{% endif %}">{{ "%+d"|format(affection_delta) }}</span>
+        {% endif %}
+      </div>
+      <div class="affection-track">
+        <span class="affection-fill" style="width:{{ affection_percent }}%;background:linear-gradient(90deg,{{ affection_color }},{{ affection_color }}dd)"></span>
+      </div>
+      <div class="affection-stage">心情 · {{ mood_label|e }}</div>
+    </div>
+  </div>
+
   {% if char_url %}<div class="char-box" style="left:{{ char_left }}%; top:{{ char_top }}px; width:{{ char_max_width }}%; height:{{ char_height }}px;"><img src="{{ char_url }}" alt=""/></div>{% endif %}
 
+  {% if ending %}
+  <div class="ending-banner">
+    <span class="e-kicker">ENDING</span>
+    <span class="e-title">{{ ending_title|e }}</span>
+    <span class="e-sub">本局故事到此结束 · 发送 /gal start 开始新周目</span>
+  </div>
+  {% endif %}
+
+  {% if not ending %}
   <div class="opt-header">选择你的回应</div>
   {% for option in options %}
   <div class="option {{ option.cls }}" style="top:{{ option.top }}px">
     <span class="opt-letter {{ option.letter_cls }}">{{ option.letter }}</span>
     <span class="opt-text">{{ option.text|e }}</span>
+    {% if option.branch %}<span class="opt-branch">{{ option.branch_label|e }}</span>{% endif %}
   </div>
   {% endfor %}
+  {% endif %}
 
   <div class="box">
     <div class="ask">

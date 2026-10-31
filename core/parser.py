@@ -20,7 +20,15 @@ _EMO_RE = re.compile(r"<emo>(.*?)</emo>", re.S | re.I)
 _SAY_RE = re.compile(r"<say>(.*?)</say>", re.S | re.I)
 _LINE_RE = re.compile(r"<line>(.*?)</line>", re.S | re.I)
 _OPT_RE = re.compile(r"<opt>(.*?)</opt>", re.S | re.I)
-_KNOWN_TAG_RE = re.compile(r"</?(?:emo|say|line|opt|narration|narr)\b[^>]*>", re.I)
+_OPT_TAG_RE = re.compile(r"<opt\b([^>]*)>(.*?)</opt>", re.S | re.I)
+_ENDING_RE = re.compile(r"<ending\b[^>]*>(.*?)</ending>", re.S | re.I)
+_ENDING_SELF_RE = re.compile(r"<ending\b[^>]*\bid\s*=\s*[\"']([^\"']+)[\"'][^>]*/?>", re.I)
+_AFFECTION_RE = re.compile(r"<affection\b[^>]*>(.*?)</affection>", re.S | re.I)
+_AFFECTION_SELF_RE = re.compile(
+    r"<affection\b[^>]*\bdelta\s*=\s*[\"']([+-]?\d+)[\"'][^>]*/?>",
+    re.I,
+)
+_KNOWN_TAG_RE = re.compile(r"</?(?:emo|say|line|opt|affection|ending|narration|narr)\b[^>]*>", re.I)
 _ANY_TAG_RE = re.compile(r"</?[a-zA-Z][^>]{0,40}>")
 _CODE_FENCE_RE = re.compile(r"```[a-zA-Z0-9_+-]*\s*\n?")
 _INVIS_RE = re.compile(r"\[(?:MSG_ID|引用|CQ)[^\]]*\]|[\u200b\u200c\u200d\ufeff]")
@@ -63,6 +71,9 @@ class GalTurn:
     emotion: str = ""
     raw: str = ""
     lines: list[GalLine] = field(default_factory=list)
+    affection_delta: int | None = None
+    option_meta: list[dict] = field(default_factory=list)
+    ending: str = ""
 
 
 @dataclass
@@ -194,6 +205,34 @@ def parse_gal_reply(text: str, option_max_units: float = 16.0) -> GalTurn:
     if not raw:
         return GalTurn(raw=text or "")
 
+    affection_delta: int | None = None
+    self_match = _AFFECTION_SELF_RE.search(raw)
+    if self_match:
+        try:
+            affection_delta = int(self_match.group(1))
+        except ValueError:
+            affection_delta = None
+    else:
+        affection_match = _AFFECTION_RE.search(raw)
+        if affection_match:
+            try:
+                affection_delta = int(affection_match.group(1).strip().replace("+", ""))
+            except ValueError:
+                affection_delta = None
+    raw = _AFFECTION_SELF_RE.sub("", raw)
+    raw = _AFFECTION_RE.sub("", raw)
+
+    ending = ""
+    ending_self = _ENDING_SELF_RE.search(raw)
+    if ending_self:
+        ending = ending_self.group(1).strip()
+    else:
+        ending_match = _ENDING_RE.search(raw)
+        if ending_match:
+            ending = ending_match.group(1).strip()
+    raw = _ENDING_SELF_RE.sub("", raw)
+    raw = _ENDING_RE.sub("", raw)
+
     # Some models ignore the tag format and return JSON instead.
     if raw.startswith("{"):
         try:
@@ -218,7 +257,13 @@ def parse_gal_reply(text: str, option_max_units: float = 16.0) -> GalTurn:
                 emotion = normalize_emotion(str(payload.get("emotion") or payload.get("emo") or ""))
                 options = [fit_text(item, option_max_units) for item in _dedupe(options)][:4]
                 if say or len(options) >= 2:
-                    return GalTurn(say=say, options=options, emotion=emotion, raw=text or "")
+                    return GalTurn(
+                        say=say,
+                        options=options,
+                        emotion=emotion,
+                        raw=text or "",
+                        affection_delta=affection_delta,
+                    )
 
     # Multi-line format: <line><emo>...</emo><say>...</say></line>
     lines: list[GalLine] = []
@@ -246,8 +291,22 @@ def parse_gal_reply(text: str, option_max_units: float = 16.0) -> GalTurn:
         say = _clean_say(say_match.group(1))
     raw = _SAY_RE.sub("", raw)
 
-    options = [clean_option(item) for item in _OPT_RE.findall(raw)]
-    options = [item for item in options if item]
+    options: list[str] = []
+    option_meta: list[dict] = []
+    for match in _OPT_TAG_RE.finditer(raw):
+        text = clean_option(match.group(2))
+        if not text:
+            continue
+        attrs = {}
+        for attr in re.finditer(r"([a-zA-Z_]+)\s*=\s*[\"']([^\"']*)[\"']", match.group(1) or ""):
+            attrs[attr.group(1).lower()] = attr.group(2).strip()
+        options.append(text)
+        option_meta.append(attrs)
+    if not options:
+        options = [clean_option(item) for item in _OPT_RE.findall(raw)]
+        options = [item for item in options if item]
+        option_meta = [{} for _ in options]
+    raw = _OPT_TAG_RE.sub("", raw)
     raw = _OPT_RE.sub("", raw)
 
     if len(options) < 2:
@@ -261,20 +320,39 @@ def parse_gal_reply(text: str, option_max_units: float = 16.0) -> GalTurn:
                 if first_list is not None:
                     say = _clean_say(raw[:first_list])
             options = listed
+            option_meta = [{} for _ in options]
 
     if not say:
         say = _clean_say(raw)
 
-    options = _dedupe(options)
-    options = [fit_text(item, option_max_units) for item in options][:4]
-    options = [item for item in options if item]
+    deduped: list[str] = []
+    deduped_meta: list[dict] = []
+    seen: set[str] = set()
+    for index, item in enumerate(options):
+        key = item.casefold()
+        if not item or key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+        deduped_meta.append(option_meta[index] if index < len(option_meta) else {})
+    options = [fit_text(item, option_max_units) for item in deduped][:4]
+    option_meta = deduped_meta[: len(options)]
 
     if not options:
         say = _clean_say(_ANY_TAG_RE.sub("", text or ""))
     if lines:
         say = " ".join(item.say for item in lines)
         emotion = lines[-1].emotion or lines[0].emotion or emotion
-    return GalTurn(say=say, options=options, emotion=emotion, raw=text or "", lines=lines)
+    return GalTurn(
+        say=say,
+        options=options,
+        emotion=emotion,
+        raw=text or "",
+        lines=lines,
+        affection_delta=affection_delta,
+        option_meta=option_meta,
+        ending=ending,
+    )
 
 
 def normalize_text(text: str) -> str:
@@ -345,6 +423,8 @@ def is_start_intent(text: str, words: list[str] | tuple[str, ...] = ()) -> bool:
     if any(_intent_text(word) and _intent_text(word) in normalized for word in words):
         return True
     if normalized in {"gal", "galgame"} or "gal模式" in normalized or "gal游戏" in normalized:
+        return True
+    if normalized.startswith("gal") and len(normalized) > 3:
         return True
     return "gal" in normalized and any(marker in normalized for marker in _START_MARKERS)
 

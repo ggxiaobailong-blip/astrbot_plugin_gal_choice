@@ -15,7 +15,7 @@ import re
 import time
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
+from PIL import Image, ImageColor, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 from .config import PluginConfig, plugin_data_dir
 
@@ -353,14 +353,127 @@ def _draw_dialog(canvas: Image.Image, data: dict) -> None:
     canvas.alpha_composite(overlay)
 
 
+def _draw_affection_hud(canvas: Image.Image, data: dict) -> None:
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    hx, hy, hw, hh = W - 28 - 300, 24, 300, 76
+    draw.rounded_rectangle(
+        (hx, hy, hx + hw, hy + hh),
+        radius=17,
+        fill=(8, 18, 32, 142),
+        outline=(255, 255, 255, 56),
+    )
+    mood = str(data.get("mood", "calm") or "calm")
+    face_color = str(data.get("mood_color", "#f2e7d5") or "#f2e7d5")
+    try:
+        face_rgb = ImageColor.getrgb(face_color)
+    except ValueError:
+        face_rgb = (242, 231, 213)
+    cx, cy = hx + 31, hy + 36
+    draw.ellipse((cx - 17, cy - 17, cx + 17, cy + 17), fill=(*face_rgb, 255))
+    eye = (59, 48, 43, 255)
+    if mood in {"happy", "shy"}:
+        draw.arc((cx - 9, cy - 7, cx - 3, cy - 1), 200, 340, fill=eye, width=2)
+        draw.arc((cx + 3, cy - 7, cx + 9, cy - 1), 200, 340, fill=eye, width=2)
+        draw.arc((cx - 6, cy + 1, cx + 6, cy + 8), 20, 160, fill=eye, width=2)
+    elif mood == "sad":
+        draw.line((cx - 9, cy - 5, cx - 3, cy - 5), fill=eye, width=2)
+        draw.line((cx + 3, cy - 5, cx + 9, cy - 5), fill=eye, width=2)
+        draw.arc((cx - 6, cy + 1, cx + 6, cy + 8), 200, 340, fill=eye, width=2)
+    elif mood == "angry":
+        draw.line((cx - 9, cy - 7, cx - 3, cy - 4), fill=eye, width=2)
+        draw.line((cx + 3, cy - 4, cx + 9, cy - 7), fill=eye, width=2)
+        draw.arc((cx - 6, cy + 1, cx + 6, cy + 8), 200, 340, fill=eye, width=2)
+    elif mood == "disgust":
+        draw.line((cx - 9, cy - 4, cx - 3, cy - 4), fill=eye, width=2)
+        draw.line((cx + 3, cy - 4, cx + 9, cy - 4), fill=eye, width=2)
+        draw.arc((cx - 6, cy + 1, cx + 6, cy + 8), 200, 340, fill=eye, width=2)
+    elif mood == "surprised":
+        draw.ellipse((cx - 7, cy - 6, cx - 4, cy - 3), fill=eye)
+        draw.ellipse((cx + 4, cy - 6, cx + 7, cy - 3), fill=eye)
+        draw.ellipse((cx - 3, cy + 1, cx + 3, cy + 7), outline=eye, width=2)
+    elif mood == "confused":
+        draw.line((cx - 9, cy - 5, cx - 3, cy - 5), fill=eye, width=2)
+        draw.line((cx + 3, cy - 5, cx + 9, cy - 5), fill=eye, width=2)
+        draw.arc((cx - 6, cy + 1, cx + 6, cy + 8), 20, 160, fill=eye, width=2)
+    else:
+        draw.ellipse((cx - 7, cy - 4, cx - 5, cy - 2), fill=eye)
+        draw.ellipse((cx + 5, cy - 4, cx + 7, cy - 2), fill=eye)
+        draw.arc((cx - 6, cy + 1, cx + 6, cy + 8), 20, 160, fill=eye, width=2)
+
+    hx2 = hx + 58
+    draw.polygon(
+        [(hx2 + 7, hy + 18), (hx2 + 3, hy + 14), (hx2 + 1, hy + 17),
+         (hx2 + 7, hy + 23), (hx2 + 13, hy + 17), (hx2 + 11, hy + 14)],
+        fill=(255, 157, 189, 255),
+    )
+    draw.text((hx2 + 19, hy + 12), "好感度", font=_font(11), fill=(235, 245, 255, 205))
+    delta = int(data.get("affection_delta", 0) or 0)
+    if delta:
+        color = (8, 36, 61, 255) if delta < 0 else (66, 24, 42, 255)
+        bg = (111, 182, 255, 255) if delta < 0 else (242, 156, 196, 255)
+        text = f"{delta:+d}"
+        tw = int(draw.textlength(text, font=_font(14)))
+        draw.rounded_rectangle(
+            (hx + hw - 14 - tw - 14, hy + 9, hx + hw - 14, hy + 33),
+            radius=12,
+            fill=bg,
+            outline=(255, 255, 255, 60),
+        )
+        draw.text((hx + hw - 14 - tw - 7, hy + 12), text, font=_font(14), fill=color)
+
+    bx = hx + 58
+    by = hy + 43
+    bw = hw - 72
+    draw.rounded_rectangle((bx, by, bx + bw, by + 9), radius=5, fill=(255, 255, 255, 44))
+    color = str(data.get("affection_color", "#6fb6ff") or "#6fb6ff")
+    try:
+        fill = ImageColor.getrgb(color)
+    except ValueError:
+        fill = (111, 182, 255)
+    percent = max(0, min(100, int(data.get("affection_percent", 0) or 0)))
+    if percent:
+        draw.rounded_rectangle(
+            (bx, by, bx + int(bw * percent / 100), by + 9),
+            radius=5,
+            fill=(*fill, 255),
+        )
+    draw.text(
+        (bx, hy + 57),
+        "心情 · " + str(data.get("mood_label", "平静")),
+        font=_font(10),
+        fill=(226, 239, 251, 190),
+    )
+    canvas.alpha_composite(overlay)
+
+
+def _draw_ending_banner(canvas: Image.Image, data: dict) -> None:
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    title = str(data.get("ending_title") or "结局")
+    width = max(520, min(720, int(draw.textlength(title, font=_font(38))) + 120))
+    height = 166
+    x1, y1 = (W - width) // 2, (H - height) // 2
+    x2, y2 = x1 + width, y1 + height
+    draw.rounded_rectangle((x1, y1, x2, y2), radius=24, fill=(8, 18, 32, 184), outline=(255, 255, 255, 76), width=2)
+    draw.text((x1 + 42, y1 + 22), "E N D I N G", font=_font(11), fill=(255, 205, 225, 225))
+    draw.text((x1 + 42, y1 + 48), title, font=_font(38), fill=(255, 255, 255, 255))
+    draw.text((x1 + 42, y1 + 112), "本局故事到此结束 · /gal start 新周目", font=_font(10), fill=(224, 238, 251, 180))
+    canvas.alpha_composite(overlay)
+
+
 def render_local(data: dict, config: PluginConfig | None = None) -> str:
     """Render one gal card to a JPEG and return its filesystem path."""
     canvas = Image.new("RGBA", (W, H), (10, 18, 32, 255))
     _draw_background(canvas, data)
     _draw_character(canvas, data)
-    _draw_options(canvas, data)
+    if data.get("ending"):
+        _draw_ending_banner(canvas, data)
+    else:
+        _draw_options(canvas, data)
     _draw_dialog(canvas, data)
     _draw_scene_tag(canvas)
+    _draw_affection_hud(canvas, data)
 
     cache = plugin_data_dir("astrbot_plugin_gal_choice") / "image_cache"
     cache.mkdir(parents=True, exist_ok=True)

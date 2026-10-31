@@ -57,6 +57,9 @@ class RendererTest(unittest.TestCase):
         self.assertEqual(len(data["lines"]), 3)
         self.assertTrue(all(item["font"] >= 17 for item in data["lines"]))
         self.assertEqual(data["lines"][0]["text"], "你终于来了。")
+        self.assertEqual(data["affection"], 50)
+        self.assertEqual(data["affection_stage"], "平和")
+        self.assertEqual(data["mood"], "calm")
 
     def test_local_renderer_outputs_card(self):
         from PIL import Image

@@ -1,42 +1,64 @@
 # GalGame 选项
 
-把 AstrBot 的回答变成一张 GalGame 界面图：角色立绘、打字机式对话框、A/B/C/D 选项，还有一条角色语音。
+把 AstrBot 的回答变成一张 GalGame 界面图：角色立绘、连续对话、A/B/C/D 选项、好感度 HUD、TTS 语音，以及会自然走向结局的剧本。
 
-> 进入 gal 模式后，模型每轮只输出「表情 + 台词 + 2~4 个选项」，插件负责渲染和接住玩家的选择；
-> 选项会带进下一轮，形成连续剧情。没有想选的可以回 `0`，或者直接说自己的话。
+> 当前版本 **0.8.0**。更新日志见 [CHANGELOG.md](CHANGELOG.md)。
 
 ![效果预览](docs/preview.jpg)
 
-![资源工作台](docs/webui.jpg)
+> 仅支持 **QQ 个人号私聊**（aiocqhttp / NapCat）。群聊触发会提示切到私聊。
 
-## 功能
+## 最重要的几点
 
-- **WebUI 资源工作台**：在插件详情页打开可视化视图，上传角色立绘/表情差分/背景；拖动滑块时用本地草稿即时预览位置，点「生成最终图」才走 T2I。
-- **多角色档案**：内置鲸鱼娘只读；新建角色后可上传自己的默认立绘和 18 类情绪差分，随时切换。
-- **情绪共用**：支持 FishAudio 的 49 个情绪标签，自动归到 18 个视觉组；同一张立绘可以在 WebUI 里共用给多个情绪，不用每个情绪都画一张。
-- **背景库**：内置背景 + 自定义背景；可跟随会话、随机，或固定一张。
-- **一键进入 gal 模式**：`/gal start`，或直接说“gal”。
-- **选项成图**：1280×720，角色立绘按表情切换，对话框显示玩家的原话和角色台词。
-- **三种选择方式**：回字母 `A/B/C/D`、回数字 `1/2/3/4`、回选项原文；也支持 `0` 或直接说话自由输入。
-- **连续剧情**：选择会写进下一轮 prompt，插件同时保存最近几幕的选择摘要，上下文被裁剪也能接上。
-- **TTS 配音**：图片发出后，把台词交给 AstrBot 的 TTS 提供商念出来；FishAudio 会自动加情绪标签，QQ 侧预转 SILK 兼容 NapCat。
-- **会话级模型**：`/gal model <provider_id>` 指定 gal 模式用哪个模型，退出时恢复原模型。
-- **背景连续**：默认一个会话固定一张背景，不会每轮跳来跳去；可切换为随机或固定。
-- **角色视角**：台词强制为角色第一人称直接对玩家说的话，禁止旁白、小说叙述、动作/环境/心理描写；选项也要求是玩家能直接说出口的回应。
-- **出图优先级**：默认 `render_backend=auto`，先用 T2I 出图；T2I 失败或超过 15 秒自动切换本地 Chromium HTML/CSS；浏览器不可用才用 Pillow 兜底。T2I 失败端点会冷却 180 秒，避免每轮都等超时。界面布局和 T2I 保持同一套模板、同一套图标和幕数。
-- **本地浏览器**：可执行 `python -m playwright install chromium` 安装；安装后 T2I 失败也能得到与 T2I 同一套 HTML/CSS 的完整效果。
-- **单图多行**：一轮可输出 2~3 行连续台词，仍只生成一张 1280×720 图；多行语音按句合成、插入可配置静音后合并成一条语音。
-- **内置防抖**：gal 模式下同一用户连续发来的几条消息会合并成一轮再请求模型，不需要额外装防抖插件。**本插件已包含完整防抖能力，请不要再同时启用 `reply_merge` 等外部防抖插件**；如果服务器上已经装了，请在 WebUI 里关闭它，否则同一轮可能被合并两次。
-- **失败可降级**：模型没按格式输出或 T2I 出图失败时，发可读的文字选项，不会把 `<say><opt>` 原样吐给玩家。
-- **数据安全**：状态放在 `data/plugin_data/`，带 TTL、原子写和并发锁；不会因为更新插件丢档。
+- **出图优先级**：T2I → 本地 Chromium HTML/CSS → Pillow 兜底。T2I 失败或超时 15 秒会自动切本地，不会因为远程 502/503 卡死。
+- **本地浏览器可选**：执行 `python -m playwright install chromium` 后，T2I 不可用也能得到完整 HTML/CSS 效果；没有浏览器时 Pillow 仍可出图。
+- **内置防抖**：同一用户连续消息会合并成一轮。**不要再同时启用 `reply_merge`**，否则会双重合并。
+- **好感度**：初始 50，只在明显影响情绪的选项/自由回答时变化；数值隐藏，变化时显示粉色 `+3` 或蓝色 `-3`。
+- **剧本与结局**：进入时生成开局大纲；没有固定幕数，剧情自然收束时才进入结局。`/gal start` 或 `/gal new` 开始新周目。
+- **存档**：最多 10 个 JSON 存档，包含进度、好感、心情、剧本、分支和结局状态。
+
+## 快速开始
+
+```text
+/gal start [题材]   进入 GalGame；可指定“校园恋爱”“雨夜悬疑”等
+/gal new [题材]     开新周目
+/gal stop           退出
+/gal status         查看进度、好感、剧本、结局和语音状态
+/gal save 名字      存档
+/gal load 名字      读档；不带名字查看列表
+/gal saves          查看存档列表
+/gal delete 名字    删除存档
+/gal model <id>     指定 gal 使用的模型
+/gal voice on|off   开关语音
+/gal help           查看全部命令
+```
+
+进入后：
+
+1. 发一句话，或直接说“开始”，模型给出第一张图和选项；
+2. 回 `A/B/C/D`、`1/2/3/4` 或选项原文；
+3. 回 `0` 或直接说话自由输入；
+4. 想退出说“退出gal模式”或发 `/gal stop`。
 
 ## 环境要求
 
-- AstrBot `>=4.21,<5`
-- 一个可用的 **文转图（T2I）** 服务：AstrBot 自带的 Playwright 渲染，或远程 T2I 服务
-- 一个可用的 **TTS** 提供商（可选，但强烈推荐 FishAudio）
-- QQ 语音需要 **`silk-python`**（`requirements.txt` 已声明，市场安装会自动装）和 **ffmpeg**；插件会把 WAV/MP3 预转成 Tencent SILK，绕过 NapCat 自带 ffmpeg 缺少 `ntsilk_s16le` 编码器的问题。注意 AstrBot 的普通 `Record` 会强制转回 WAV，本插件用专用 `_SilkRecord` 直接发送 SILK base64。
-- 消息平台：**QQ 个人号（aiocqhttp / NapCat）**。本版本只声明支持 `aiocqhttp`
+- AstrBot `>=4.21,<5`；
+- 私聊平台：QQ 个人号（aiocqhttp / NapCat）；
+- 出图：优先使用 AstrBot 的 T2I；T2I 不可用时需要本地 Chromium（推荐）或 Pillow 兜底；
+- 语音可选：FishAudio 等 AstrBot TTS；
+- QQ 语音需要 `silk-python`（`requirements.txt` 已声明）和 `ffmpeg`。
+
+## 功能
+
+- **选项成图**：1280×720，立绘按情绪切换，2~3 行连续台词，选项和自由输入位。
+- **三种选择方式**：字母、数字、选项原文；`0` 或直接说话自由输入。
+- **WebUI 资源工作台**：多角色、18 类情绪差分、自定义背景、位置/高度/宽度可视化调整。
+- **TTS 配音**：台词按句合成，句间可配置静音；QQ 侧预转 SILK 兼容 NapCat。
+- **好感度 HUD**：阶段颜色进度条 + 8 类心情脸；条下显示当前心情。
+- **剧本大纲**：标题、题材、背景、主线、预计幕数、关键分支、结局候选；不固定幕数。
+- **关键分支**：情感/理性分支用粉/蓝边框和标签提示，一屏最多 1~2 个。
+- **结局与周目**：结局图隐藏选项，显示大号 ENDING 标题；可开新周目。
+- **存档/防抖/角色视角/失败降级**：状态原子写，模型输出不合格时退回可读文字。
 
 ## 安装
 
@@ -52,24 +74,33 @@ git clone https://github.com/ggxiaobailong-blip/astrbot_plugin_gal_choice.git
 pip install -r astrbot_plugin_gal_choice/requirements.txt
 ```
 
+可选安装本地 Chromium，让 T2I 失败时仍能使用完整 HTML/CSS：
+
+```bash
+python -m playwright install chromium
+```
+
 重启 AstrBot 或重载插件。市场安装会自动处理 `requirements.txt`。
 
 ## 使用
 
 ```text
 /gal                进入 GalGame 模式（也可以直接说“gal”）
-/gal start          进入 GalGame 模式
+/gal start [题材]   进入 GalGame 模式；可指定“校园恋爱”等题材
+/gal new [题材]     结束当前局，开启新周目
 /gal stop           退出
 /gal status         查看当前模式、选项、幕数、模型、语音状态
 /gal model <id>     指定 gal 模式使用的模型；default 恢复跟随会话
 /gal voice on|off   开关本会话语音
+/gal save 名字      保存当前进度（最多 10 个）
+/gal load 名字      读取存档；不带名字查看列表
+/gal saves          查看存档列表
+/gal delete 名字    删除存档
 /gal reset          清空本会话状态
 /gal help           查看帮助
 ```
 
-群聊里可以 `@机器人 gal启动`、`@机器人 gal` 或 `@机器人 进入gal模式`；插件会先去掉 @ 前缀再匹配。群聊和私聊使用独立的 gal 会话。
-
-启动/退出是模糊匹配的：`gal启动！`、`启动gal`、`来玩gal` 都会进入；`结束gal`、`gal结束`、`不玩了`、`退出`、`关闭` 都会退出。**退出优先**，所以 `结束gal` 不会被当成再次启动。
+GalGame 仅在私聊开放；群聊触发会提示切到私聊。启动/退出是模糊匹配的：`gal启动！`、`启动gal`、`来玩gal` 都会进入；`结束gal`、`gal结束`、`不玩了`、`退出`、`关闭` 都会退出。**退出优先**，所以 `结束gal` 不会被当成再次启动。
 
 进入模式后：
 
@@ -77,6 +108,7 @@ pip install -r astrbot_plugin_gal_choice/requirements.txt
 2. 回 `A` / `B` / `C` / `D`（或 `1` / `2` / `3` / `4`）选择。
 3. 没有想选的，回 `0`，或者直接说你想说的话。
 4. 想退出，说“退出gal模式”或发 `/gal stop`。
+
 
 ## 自定义立绘 / 背景
 
@@ -140,8 +172,7 @@ data/plugin_data/astrbot_plugin_gal_choice/
 
 `blank.webp` / `teary.webp` 目前带白边和未抠图内部，后续替换同名文件即可，不需要改配置。
 
-> 群里第一次进入：直接说“进入gal模式”或发 `/gal start` 都可以（如果平台/其他插件拦住了未 @ 的消息，先 @ 机器人）。
-> 进入模式后，裸字母会自动唤醒，不用每轮都 @。
+> GalGame 仅在私聊开放。第一次进入直接说“进入gal模式”或发 `/gal start`；群聊会提示切到私聊。
 
 ## 配置
 
@@ -149,8 +180,8 @@ data/plugin_data/astrbot_plugin_gal_choice/
 
 | 配置项 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| `mode_on_words` | string | `进入gal模式,gal模式,切换gal模式,开始gal` | 进入模式的说法，整条消息完全一致才触发 |
-| `mode_off_words` | string | `退出gal模式,退出gal,结束gal,退出游戏,关闭gal` | 退出模式的说法，整条消息完全一致才触发 |
+| `mode_on_words` | string | 见默认配置 | 进入模式的说法；支持整条匹配和 `gal 题材` 前缀 |
+| `mode_off_words` | string | 见默认配置 | 退出模式的说法，整条消息基本一致才触发 |
 | `mode_idle_minutes` | int | `120` | 无互动自动退出模式的分钟数 |
 | `option_ttl` | int | `600` | 选项有效秒数 |
 | `bot_label` | string | `小鲸鱼` | 台词框前的名字标签 |
@@ -187,24 +218,25 @@ data/plugin_data/astrbot_plugin_gal_choice/
 ## 工作原理
 
 ```text
-用户消息
-  └─ gal_gate：会话在 gal 模式 → 打开 is_at_or_wake_command（群聊裸字母也能触发 LLM）
-      └─ inject_choice：把“玩家选了 X”+ 输出格式写进 system prompt
-          └─ 模型输出 <emo>/<say>/<opt>
-              └─ decorate_result：解析 → Jinja2 模板 → html_render 出图
-                  └─ 图片发送后 after_message_sent → TTS 语音
+用户私聊消息
+  └─ gal_gate：私聊 + gal 模式 → 放行
+      └─ gal_debounce：同一用户连续消息合并
+          └─ inject_choice：注入剧本大纲、分支、好感/心情、结局和输出格式
+              └─ 模型输出 <line>/<opt>/<affection>/<ending>
+                  └─ decorate_result：解析 → HUD/选项/结局 → 出图
+                      └─ after_message_sent → TTS 语音
 ```
 
 - 模板在 `templates/gal.html`，所有用户文本都通过 Jinja2 的 `data` 传入并用 `|e` 转义，不拼进模板源码。
-- gal 模式会关闭本轮流式输出，等模型给出完整台词和选项后再出图；退出模式后恢复 AstrBot 的流式设置。
-- gal 模式会临时关闭本轮的工具调用，避免模型在出图前插入工具状态文字；退出模式后工具恢复。
-- 状态在 `data/plugin_data/astrbot_plugin_gal_choice/sessions.json`，原子写（临时文件 + `os.replace`）。
-- 出图失败、选项不足 2 个、T2I 不可用时，统一降级成可读文字。
+- 出图优先级：T2I → 本地 Chromium → Pillow；T2I 失败端点冷却，避免每轮等超时。
+- 每轮会保存剧本、好感、心情、选项和分支状态；结局后停止普通 gal 回合。
+- 状态在 `data/plugin_data/astrbot_plugin_gal_choice/sessions.json`，手动存档在 `saves.json`，均为原子写。
+- 模型输出不合格、选项不足 2 个时降级为可读文字；结局回合允许没有选项。
 
 ## 常见问题
 
 **Q：群里回 A 没反应？**  
-A：确认已经进入 gal 模式；第一次进入需要 @ 机器人或发 `/gal start`。进入后插件会显式设置 `is_at_or_wake_command`，裸字母也能触发。
+A：GalGame 已改为仅私聊开放；群里发送 `/gal start` 会提示切到私聊。
 
 **Q：图片没生成，发了一段文字？**  
 A：说明 T2I 渲染失败或模型没给出 2 个以上选项。插件会发可读的文字选项，不会泄露 `<say>` 标签。检查 AstrBot 的文转图服务。
